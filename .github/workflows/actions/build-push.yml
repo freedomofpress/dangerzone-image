@@ -26,10 +26,6 @@ on:
         required: false
         type: string
         default: "dangerzone-tests"
-      trivially_update_container:
-        required: false
-        type: boolean
-        default: false
     secrets:
       registry_token:
         required: true
@@ -68,11 +64,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Update the contents of the inner container if asked-for
-        if: ${{ inputs.trivially_update_container }}
-        run: |
-          echo "# A comment to generate a new container hash $RANDOM" >> conversion/doc_to_pixels.py
-
       - name: Compute image parameters
         id: params
         run: |
@@ -106,11 +97,6 @@ jobs:
             name: "linux/arm64"
     steps:
       - uses: actions/checkout@v6
-
-      - name: Update the contents of the inner container if asked-for
-        if: ${{ inputs.trivially_update_container }}
-        run: |
-          echo "# A comment to generate a new container hash" >> conversion/doc_to_pixels.py
 
       - name: Prepare
         run: |
