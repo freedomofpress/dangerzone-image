@@ -115,7 +115,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: ./dangerzone/
+          context: ./src/
           file: Dockerfile
           build-args: |
             DEBIAN_ARCHIVE_DATE=${{ needs.prepare.outputs.debian_archive_date }}
