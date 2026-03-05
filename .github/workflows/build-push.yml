@@ -40,12 +40,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install dev. dependencies
-        run: |-
-          sudo apt-get update
-          sudo apt-get install -y git python3-poetry --no-install-recommends
-          poetry install --only package
-
       - name: Verify that the Dockerfile matches the committed template and params
         run: |-
           cp Dockerfile Dockerfile.orig
