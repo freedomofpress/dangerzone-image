@@ -178,9 +178,8 @@ class DocumentToPixels(DangerzoneConverter):
         elif conversion["type"] == "libreoffice":
             libreoffice_ext = conversion.get("libreoffice_ext", None)
             # Disable conversion for HWP/HWPX on specific platforms. See:
-            #
-            #     https://github.com/freedomofpress/dangerzone/issues/494
-            #     https://github.com/freedomofpress/dangerzone/issues/498
+            # - https://github.com/freedomofpress/dangerzone/issues/494
+            # - https://github.com/freedomofpress/dangerzone/issues/498
             if libreoffice_ext == "h2orestart.oxt" and running_on_qubes():
                 raise errors.DocFormatUnsupportedHWPQubes()
             if libreoffice_ext:

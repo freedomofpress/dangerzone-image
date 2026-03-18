@@ -9,7 +9,14 @@ description = "Internal (INSECURE!) Dangerzone document to pixels conversion."
 readme = "README.md"
 requires-python = ">3.11"
 dependencies = [
-    "pymupdf"
+    "pymupdf",
+    "python-magic",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
 ]
 
 [build-system]
