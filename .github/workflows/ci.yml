@@ -33,7 +33,7 @@ jobs:
 
       - name: Load local image for tests
         run: |
-          podman load -i container.tar | sed -e 's/Loaded image: //' | xargs > tests/share/image-id.txt
+          podman load -i container.tar | sed -e 's/Loaded image: //' | tr -d '\n' > tests/share/image-id.txt
 
       - name: Install dependencies
         run: uv venv && uv pip install -e ".[dev]"
