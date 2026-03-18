@@ -72,11 +72,16 @@ def write_reference_data(path: Path, data: bytes) -> None:
 
 @for_each_doc
 @pytest.mark.asyncio
-async def test_convert_document(doc: Path, tmp_path: Path) -> None:
+async def test_convert_document(
+    request: pytest.FixtureRequest, doc: Path, tmp_path: Path
+) -> None:
     """Test conversion to pixels for each valid document.
 
+    By default, conversion tests run in a container; pass --only-local to run locally.
     Reference pixel data comparisons are only performed in the container test.
     """
+    if not request.config.getoption("--only-local"):
+        pytest.skip("Local conversion tests are disabled by default; use --only-local.")
     input_file = Path("/tmp/input_file")
 
     try:
@@ -146,7 +151,10 @@ async def test_convert_document_container(
 
     Pass --container-image <image> to enable these tests.
     Pass --update-pixel-references to regenerate the reference .bin files (gzip-compressed).
+    Pass --only-local to skip container conversion tests.
     """
+    if request.config.getoption("--only-local"):
+        pytest.skip("Skipping container conversion tests due to --only-local.")
     input_file = Path("/tmp/input_file")
 
     try:

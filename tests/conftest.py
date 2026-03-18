@@ -104,6 +104,8 @@ def get_runtime_security_args() -> List[str]:
 @pytest.fixture
 def container_image(request: pytest.FixtureRequest) -> str:
     """Return the container image to use for container conversion tests."""
+    if request.config.getoption("--only-local"):
+        pytest.skip("Skipping container tests due to --only-local.")
     image = (_DANGERZONE_SHARE_DIR / "image-id.txt").open().read()
     if not image:
         image = request.config.getoption("--container-image")
@@ -135,4 +137,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--container-image",
         default=None,
         help="Container image to use for container conversion tests",
+    )
+    parser.addoption(
+        "--only-local",
+        action="store_true",
+        default=False,
+        help="Run conversion tests locally only (skip container conversion tests)",
     )
