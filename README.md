@@ -67,4 +67,7 @@ uv run pytest
 
 # Or, if you prefer to run the tests outside the sandbox:
 uv run pytest --local
+
+# It's also possible to run tests in parallel if you have multiple cores:
+uv run --with pytest-xdist pytest -n 6
 ```
