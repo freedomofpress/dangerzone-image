@@ -7,7 +7,7 @@ authors = [
 ]
 description = "Internal (INSECURE!) Dangerzone document to pixels conversion."
 readme = "README.md"
-requires-python = ">3.11"
+requires-python = ">3.9"
 dependencies = [
     "pymupdf",
     "python-magic",
