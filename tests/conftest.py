@@ -104,13 +104,14 @@ def get_runtime_security_args() -> List[str]:
 @pytest.fixture
 def container_image(request: pytest.FixtureRequest) -> str:
     """Return the container image to use for container conversion tests."""
-    if request.config.getoption("--only-local"):
-        pytest.skip("Skipping container tests due to --only-local.")
-    image = (_DANGERZONE_SHARE_DIR / "image-id.txt").open().read()
+    image = (_DANGERZONE_SHARE_DIR / "image-id.txt").read_text().strip()
     if not image:
         image = request.config.getoption("--container-image")
     if not image:
-        pytest.skip("No --container-image provided; skipping container tests")
+        raise pytest.UsageError(
+            "No container image available. Provide --container-image or populate "
+            "tests/share/image-id.txt, or use --only-local."
+        )
     return image
 
 
@@ -142,5 +143,20 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--only-local",
         action="store_true",
         default=False,
-        help="Run conversion tests locally only (skip container conversion tests)",
+        help="Run conversion tests locally instead of in a container",
     )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    if config.getoption("--only-local") and config.getoption("--update-pixel-references"):
+        raise pytest.UsageError(
+            "--update-pixel-references must run in a container; do not combine with "
+            "--only-local."
+        )
+    if not config.getoption("--only-local"):
+        image = (_DANGERZONE_SHARE_DIR / "image-id.txt").read_text().strip()
+        if not image and not config.getoption("--container-image"):
+            raise pytest.UsageError(
+                "No container image available. Provide --container-image or populate "
+                "tests/share/image-id.txt, or use --only-local."
+            )

@@ -9,7 +9,7 @@ from conversion import errors
 from conversion.common import INT_BYTES
 from conversion.doc_to_pixels import DocumentToPixels
 
-from .conftest import TEST_DOCS_DIRECTORY, for_each_doc, get_runtime_security_args
+from .conftest import TEST_DOCS_DIRECTORY, for_each_doc
 
 REFERENCE_DIR = Path(__file__).parent / "test_docs" / "reference"
 _GZIP_MAGIC = b"\x1f\x8b"
@@ -70,43 +70,81 @@ def write_reference_data(path: Path, data: bytes) -> None:
     path.write_bytes(gzip.compress(data))
 
 
-@for_each_doc
-@pytest.mark.asyncio
-async def test_convert_document(
-    request: pytest.FixtureRequest, doc: Path, tmp_path: Path
-) -> None:
-    """Test conversion to pixels for each valid document.
-
-    By default, conversion tests run in a container; pass --only-local to run locally.
-    Reference pixel data comparisons are only performed in the container test.
-    """
-    if not request.config.getoption("--only-local"):
-        pytest.skip("Local conversion tests are disabled by default; use --only-local.")
+async def run_local_conversion(doc: Path) -> tuple[bytes, List[str]]:
     input_file = Path("/tmp/input_file")
-
     try:
         input_file.write_bytes(doc.read_bytes())
 
         converter = CapturingDocumentToPixels()
         await converter.convert()
-
-        pixel_data = converter._pixel_output.getvalue()
-        progress = converter._progress_lines
-
-        # Check progress messages
-        assert "Converted document to pixels" in progress
-
-        # Parse and validate pixel data structure
-        pages = parse_pixel_output(pixel_data)
-        assert len(pages) > 0, "Expected at least one page"
-        for width, height, rgb_data in pages:
-            assert width > 0, "Page width must be positive"
-            assert height > 0, "Page height must be positive"
-            assert len(rgb_data) == width * height * 3, "RGB data length mismatch"
-
+        return converter._pixel_output.getvalue(), converter._progress_lines
     finally:
         if input_file.exists():
             input_file.unlink()
+
+
+async def run_container_conversion(
+    doc: Path, container_image: str, container_security_args: List[str]
+) -> tuple[int, bytes, bytes]:
+    proc = await asyncio.subprocess.create_subprocess_exec(
+        "podman",
+        "run",
+        *container_security_args,
+        "--rm",
+        "-i",
+        container_image,
+        "/usr/bin/python3",
+        "-m",
+        "dangerzone.conversion.doc_to_pixels",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate(input=doc.read_bytes())
+    return proc.returncode, stdout, stderr
+
+
+@for_each_doc
+@pytest.mark.asyncio
+async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> None:
+    """Test conversion to pixels for each valid document.
+
+    By default, conversion tests run in a container; pass --local to run locally.
+    Reference pixel data comparisons are only performed in container mode.
+    """
+    if request.config.getoption("--local"):
+        pixel_data, progress = await run_local_conversion(doc)
+
+        # Check progress messages
+        assert "Converted document to pixels" in progress
+    else:
+        container_image = request.getfixturevalue("container_image")
+        container_security_args = request.getfixturevalue("container_security_args")
+        returncode, pixel_data, stderr = await run_container_conversion(
+            doc, container_image, container_security_args
+        )
+        assert returncode == 0, (
+            f"Container conversion failed (exit {returncode}).\n"
+            f"stderr: {stderr.decode(errors='replace')}"
+        )
+
+        reference_bin = REFERENCE_DIR / f"{doc.stem}.bin"
+        if request.config.getoption("--update-pixel-references"):
+            REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
+            write_reference_data(reference_bin, pixel_data)
+        elif reference_bin.exists():
+            assert pixel_data == read_reference_data(reference_bin), (
+                f"Pixel data does not match reference for {doc.name}. "
+                "Run with --update-pixel-references to regenerate."
+            )
+
+    # Parse and validate pixel data structure
+    pages = parse_pixel_output(pixel_data)
+    assert len(pages) > 0, "Expected at least one page"
+    for width, height, rgb_data in pages:
+        assert width > 0, "Page width must be positive"
+        assert height > 0, "Page height must be positive"
+        assert len(rgb_data) == width * height * 3, "RGB data length mismatch"
 
 
 @pytest.mark.parametrize(
@@ -118,79 +156,21 @@ async def test_convert_document(
     indirect=["bad_doc"],
 )
 @pytest.mark.asyncio
-async def test_bad_pdf(bad_doc: Path, expected_error: type) -> None:
-    """Test that invalid documents raise the expected errors."""
-    input_file = Path("/tmp/input_file")
-
-    try:
-        input_file.write_bytes(bad_doc.read_bytes())
-
-        converter = CapturingDocumentToPixels()
-
-        with pytest.raises(expected_error):
-            await converter.convert()
-
-    finally:
-        if input_file.exists():
-            input_file.unlink()
-
-
-@for_each_doc
-@pytest.mark.asyncio
-async def test_convert_document_container(
-    request: pytest.FixtureRequest,
-    doc: Path,
-    container_image,
-    container_security_args: List[str],
+async def test_bad_pdf(
+    request: pytest.FixtureRequest, bad_doc: Path, expected_error: type
 ) -> None:
-    """Run conversion in a container and verify it matches reference versions.
-
-    The container is invoked with the same security flags used by Dangerzone in
-    production, as defined in Container.get_runtime_security_args() from
-    dangerzone/isolation_provider/container.py
-
-    Pass --container-image <image> to enable these tests.
-    Pass --update-pixel-references to regenerate the reference .bin files (gzip-compressed).
-    Pass --only-local to skip container conversion tests.
-    """
-    if request.config.getoption("--only-local"):
-        pytest.skip("Skipping container conversion tests due to --only-local.")
-    input_file = Path("/tmp/input_file")
-
-    try:
-        # Container conversion: doc_to_pixels.main() reads from stdin, writes to stdout
-        proc = await asyncio.subprocess.create_subprocess_exec(
-            "podman",
-            "run",
-            *container_security_args,
-            "--rm",
-            "-i",
-            container_image,
-            "/usr/bin/python3",
-            "-m",
-            "dangerzone.conversion.doc_to_pixels",
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+    """Test that invalid documents raise the expected errors."""
+    if request.config.getoption("--local"):
+        with pytest.raises(expected_error):
+            await run_local_conversion(bad_doc)
+    else:
+        container_image = request.getfixturevalue("container_image")
+        container_security_args = request.getfixturevalue("container_security_args")
+        returncode, _stdout, stderr = await run_container_conversion(
+            bad_doc, container_image, container_security_args
         )
-        stdout, stderr = await proc.communicate(input=doc.read_bytes())
-
-        assert proc.returncode == 0, (
-            f"Container conversion failed (exit {proc.returncode}).\n"
+        assert returncode == expected_error.error_code, (
+            f"Container conversion failed with exit {returncode} "
+            f"(expected {expected_error.error_code}).\n"
             f"stderr: {stderr.decode(errors='replace')}"
         )
-
-        # Compare with (or update) reference pixel data using container output.
-        reference_bin = REFERENCE_DIR / f"{doc.stem}.bin"
-        if request.config.getoption("--update-pixel-references"):
-            REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
-            write_reference_data(reference_bin, stdout)
-        elif reference_bin.exists():
-            assert stdout == read_reference_data(reference_bin), (
-                f"Pixel data does not match reference for {doc.name}. "
-                "Run with --update-pixel-references to regenerate."
-            )
-
-    finally:
-        if input_file.exists():
-            input_file.unlink()
