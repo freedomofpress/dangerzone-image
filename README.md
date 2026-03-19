@@ -4,18 +4,21 @@ This repository contains the dangerzone container image that is used to perform 
 
 ## Using the container image
 
-The image is published on a monthly basis on the container registry, alongside their Cosign signatures.
+The image is published on a monthly basis on the container registry, alongside their Cosign signatures. 
+Additionally, nightly and development branches are published under the `dangerzone-testing` namespace.
 
 | Channel | Location                               | Signed?    | Use it for  |
 | ------- | -------------------------------------- | ---------- | ----------- |
-| Stable  | `ghcr.io/freedomofpress/dangerzone/v1` | ✅ (keys)  | Production  |
+| Stable  | `ghcr.io/freedomofpress/dangerzone/v1` | ✅ ([prod keys](/freedomofpress-dangerzone.pub))  | Production  |
+| Nightly | `ghcr.io/freedomofpress/dangerzone-testing/main/v1` | ✅ ([testing keys](/tests/assets/dangerzone-testing.pub))  | Development |
+| Branch  | `ghcr.io/freedomofpress/dangerzone-testing/<branch-name>/v1` | ✅ ([testing keys](/tests/assets/dangerzone-testing.pub))  | Development |
 
-Additionally, nightly and branches are published on different locations. It can be useful to use these when implementing new features, or for experimenting.
+## What this container provides
 
-| Channel | Location                                            | Signed?    | Use it for  |
-| ------- | --------------------------------------------------- | ---------- | ----------- |
-| Nightly | `ghcr.io/freedomofpress/dangerzone-testing/main/v1` | ✅ (keys)  | Development |
-| Branch  | `ghcr.io/freedomofpress/dangerzone-testing/<branch-name>/v1` | ✅ (keys)  | Development |
+This container provides a way to convert documents to pixel buffers inside a secure sandbox. The security of the sandbox is provided by different layers:
+
+- The container is [reproducible](/docs/reproducibility.md) 
+- [gVisor](/docs/gvisor.md)
 
 
 ## dangerzone-insecure-conversion python package
@@ -33,4 +36,7 @@ With that being said, there are situations where it's useful to run this code on
 ```bash
 uv pip install -e .
 uv run pytest
+
+# Or, if you prefer to run the tests outside the sandbox:
+uv run pytest --local
 ```
