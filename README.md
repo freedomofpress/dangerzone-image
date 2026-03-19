@@ -15,10 +15,38 @@ Additionally, nightly and development branches are published under the `dangerzo
 
 ## What this container provides
 
-This container provides a way to convert documents to pixel buffers inside a secure sandbox. The security of the sandbox is provided by different layers:
+This container provides a way to convert documents to pixel buffers, using a secure sandbox.
 
-- The container is [reproducible](/docs/reproducibility.md) 
-- [gVisor](/docs/gvisor.md)
+The security of the sandbox is provided by different layers:
+
+- The container uses [gVisor](/docs/gvisor.md), an application Kernel that provides a strong layer of isolation between running applications and the host operating system. It is written in a memory-safe language (Go) and runs in userspace.
+- Additionally, it is expected that this container is run with specific flags and a specific seccomp policy, to unsure that users are not mapped in the container, that no network is available in the container, etc. See the "how to use" section.
+
+We also provide the following guarantees, related to the distribution of the image:
+
+- The container is [signed](/docs/sign-image) in an auditable way, using Cosign
+- Ultimately, the container is [reproducible](/docs/reproducibility.md), and so one can verify that it can be rebuilt, resulting to the same digests.
+
+## How to use this container?
+
+The recommanded way to use this container is via these flags. They require to defined a specific seccomp policy. Seccomp policies is a way to define which system calls are authorized inside the container.
+
+Here is a podman command with the proper flags, and [the gvisor seccomp policy](tests/share/seccomp.gvisor.json).
+
+```bash
+podman run \\
+    --log-driver none \\
+    --security-opt no-new-privileges \\
+    --userns nomap \\
+    --security-opt fseccomp=seccomp.gvisor.json
+    --cap-drop all \\
+    --cap-add SYS_CHROOT \\
+    --security-opt label=type:container_engine_t \\
+    --network=none \\
+    -u dangerzone \\
+    --rm -i ghcr.io/freedomofpress/dangerzone/v1 \\
+    /usr/bin/python3 -m dangerzone.conversion.doc_to_pixels
+```
 
 
 ## dangerzone-insecure-conversion python package
