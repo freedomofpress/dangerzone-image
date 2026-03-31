@@ -328,16 +328,22 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set base image
+        run: |
+          image_with_tag="${{ needs.merge.outputs.image }}"
+          # Only keep the image name (strip the part after ":"
+          echo "BASE_IMAGE=${image_with_tag%:*}" >> "$GITHUB_ENV"
+
       - name: Capture previous latest
         run: |
-          docker buildx imagetools inspect ${{ needs.merge.outputs.image }}:latest --format '{{json .Manifest}}' > manifest || true
+          docker buildx imagetools inspect "$BASE_IMAGE:latest" --format '{{json .Manifest}}' > manifest || true
           if [ -s manifest ]; then
             digest=$(jq -r .digest manifest)
-            docker buildx imagetools create -t ${{ needs.merge.outputs.image }}:old-latest ${{ needs.merge.outputs.image }}@${digest}
+            docker buildx imagetools create -t "$BASE_IMAGE:old-latest" "$BASE_IMAGE@${digest}"
           fi
 
       - name: Update latest tag
         run: |
           docker buildx imagetools create \
-            -t ${{ needs.merge.outputs.image }}:latest \
-            ${{ needs.merge.outputs.image }}@${{ needs.merge.outputs.digest_root }}
+            -t "$BASE_IMAGE:latest" \
+            "$BASE_IMAGE@${{ needs.merge.outputs.digest_root }}"
