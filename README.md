@@ -1,6 +1,6 @@
 # Dangerzone-image
 
-This repository contains the dangerzone container image that is used to perform "document to pixels" conversions. This container is used by [dangerzone](https://dangerzone.rocks) to securely converst its documents.
+This repository contains the dangerzone container image that is used to perform "document to pixels" conversions. This container is used by [dangerzone](https://dangerzone.rocks) to securely convert its documents.
 
 ## Using the container image
 
@@ -24,27 +24,27 @@ The security of the sandbox is provided by different layers:
 
 We also provide the following guarantees, related to the distribution of the image:
 
-- The container is [signed](/docs/sign-image) in an auditable way, using Cosign
+- The container is [signed](/docs/sign-image.md) in an auditable way, using Cosign
 - Ultimately, the container is [reproducible](/docs/reproducibility.md), and so one can verify that it can be rebuilt, resulting to the same digests.
 
 ## How to use this container?
 
-The recommanded way to use this container is via these flags. They require to defined a specific seccomp policy. Seccomp policies is a way to define which system calls are authorized inside the container.
+The recommended way to use this container is via these flags. They require to defined a specific seccomp policy. Seccomp policies is a way to define which system calls are authorized inside the container.
 
 Here is a podman command with the proper flags, and [the gvisor seccomp policy](tests/share/seccomp.gvisor.json).
 
 ```bash
-podman run \\
-    --log-driver none \\
-    --security-opt no-new-privileges \\
-    --userns nomap \\
-    --security-opt fseccomp=seccomp.gvisor.json
-    --cap-drop all \\
-    --cap-add SYS_CHROOT \\
-    --security-opt label=type:container_engine_t \\
-    --network=none \\
-    -u dangerzone \\
-    --rm -i ghcr.io/freedomofpress/dangerzone/v1 \\
+podman run \
+    --log-driver none \
+    --security-opt no-new-privileges \
+    --userns nomap \
+    --security-opt seccomp=tests/share/seccomp.gvisor.json \
+    --cap-drop all \
+    --cap-add SYS_CHROOT \
+    --security-opt label=type:container_engine_t \
+    --network=none \
+    -u dangerzone \
+    --rm -i ghcr.io/freedomofpress/dangerzone/v1 \
     /usr/bin/python3 -m dangerzone.conversion.doc_to_pixels
 ```
 
