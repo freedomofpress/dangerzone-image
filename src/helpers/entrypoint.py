@@ -1,5 +1,18 @@
 #!/usr/bin/python3
+"""gVisor sandbox entrypoint.
 
+Builds an OCI runtime config and execs runsc. The config build is factored
+into ``build_oci_config()`` so it can be tested independently of the runtime.
+
+Environment variables that control this entrypoint (consumed here, never
+forwarded into the sandbox):
+
+    RUNSC_DEBUG  If set, print debug messages to stderr and log all gVisor
+                 output to stderr.
+    RUNSC_FLAGS  If set, pass these flags to the ``runsc`` invocation.
+"""
+
+import copy
 import json
 import os
 import shlex
@@ -7,30 +20,24 @@ import subprocess
 import sys
 import typing
 
-# This script wraps the command-line arguments passed to it to run as an
-# unprivileged user in a gVisor sandbox.
-# Its behavior can be modified with the following environment variables:
-#   RUNSC_DEBUG: If set, print debug messages to stderr, and log all gVisor
-#                output to stderr.
-#   RUNSC_FLAGS: If set, pass these flags to the `runsc` invocation.
-# These environment variables are not passed on to the sandboxed process.
+# Env vars forwarded from the outer container into the sandbox. Any var not
+# listed here is dropped at the sandbox boundary -- including sensitive state
+# the outer container may have inherited (cloud credentials, CI tokens, API
+# keys, and so on). Dropping (rather than masking with ``<ENV>=``) means the
+# name itself never crosses the boundary.
+ALLOWED_ENV: typing.FrozenSet[str] = frozenset(
+    {"LANG", "LC_ALL", "LC_CTYPE", "LANGUAGE", "TZ"}
+)
 
+# Baseline env vars the sandboxed process always receives. Set by the
+# entrypoint itself; not inherited from the parent environment.
+_BASELINE_ENV: typing.Tuple[str, ...] = (
+    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "PYTHONPATH=/opt/dangerzone",
+    "TERM=xterm",
+)
 
-def log(message: str, *values: typing.Any) -> None:
-    """Helper function to log messages if RUNSC_DEBUG is set."""
-    if os.environ.get("RUNSC_DEBUG"):
-        print(message.format(*values), file=sys.stderr)
-
-
-command = sys.argv[1:]
-if len(command) == 0:
-    log("Invoked without a command; will execute 'sh'.")
-    command = ["sh"]
-else:
-    log("Invoked with command: {}", " ".join(shlex.quote(s) for s in command))
-
-# Build and write container OCI config.
-oci_config: dict[str, typing.Any] = {
+_BASE_OCI_CONFIG: dict[str, typing.Any] = {
     "ociVersion": "1.0.0",
     "process": {
         "user": {
@@ -39,12 +46,8 @@ oci_config: dict[str, typing.Any] = {
             "uid": 1000,
             "gid": 1000,
         },
-        "args": command,
-        "env": [
-            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-            "PYTHONPATH=/opt/dangerzone",
-            "TERM=xterm",
-        ],
+        "args": [],
+        "env": [],
         "cwd": "/",
         "capabilities": {
             "bounding": [],
@@ -180,56 +183,77 @@ oci_config: dict[str, typing.Any] = {
         ],
     },
 }
-not_forwarded_env = set(
-    (
-        "PATH",
-        "HOME",
-        "SHLVL",
-        "HOSTNAME",
-        "TERM",
-        "PWD",
-        "RUNSC_FLAGS",
-        "RUNSC_DEBUG",
+
+
+def build_oci_config(
+    command: typing.Sequence[str],
+    env: typing.Mapping[str, str],
+) -> dict[str, typing.Any]:
+    """Build an OCI runtime config for running ``command`` in the sandbox.
+
+    Only env vars in :data:`ALLOWED_ENV` are forwarded from ``env``. Every
+    other var in ``env`` is dropped -- its name is not written into the
+    config at all.
+
+    The baseline vars in :data:`_BASELINE_ENV` are always set, and cannot be
+    overridden by ``env``.
+    """
+    config = copy.deepcopy(_BASE_OCI_CONFIG)
+    config["process"]["args"] = list(command)
+    config["process"]["env"] = list(_BASELINE_ENV) + [
+        f"{key}={val}" for key, val in env.items() if key in ALLOWED_ENV
+    ]
+    return config
+
+
+def log(message: str, *values: typing.Any) -> None:
+    """Helper function to log messages if RUNSC_DEBUG is set."""
+    if os.environ.get("RUNSC_DEBUG"):
+        print(message.format(*values), file=sys.stderr)
+
+
+def main() -> int:
+    command = sys.argv[1:]
+    if len(command) == 0:
+        log("Invoked without a command; will execute 'sh'.")
+        command = ["sh"]
+    else:
+        log("Invoked with command: {}", " ".join(shlex.quote(s) for s in command))
+
+    oci_config = build_oci_config(command, os.environ)
+
+    if os.environ.get("RUNSC_DEBUG"):
+        log("Command inside gVisor sandbox: {}", command)
+        log("OCI config:")
+        json.dump(oci_config, sys.stderr, indent=2, sort_keys=True)
+        # json.dump doesn't print a trailing newline, so print one here:
+        log("")
+    with open("/home/dangerzone/dangerzone-image/config.json", "w") as oci_config_out:
+        json.dump(oci_config, oci_config_out, indent=2, sort_keys=True)
+
+    # Run gVisor.
+    runsc_argv = [
+        "/usr/bin/runsc",
+        "--rootless=true",
+        "--network=none",
+        "--root=/home/dangerzone/.containers",
+        # Disable DirectFS for to make the seccomp filter even stricter,
+        # at some performance cost.
+        "--directfs=false",
+    ]
+    if os.environ.get("RUNSC_DEBUG"):
+        runsc_argv += ["--debug=true", "--alsologtostderr=true"]
+    if os.environ.get("RUNSC_FLAGS"):
+        runsc_argv += [x for x in shlex.split(os.environ.get("RUNSC_FLAGS", "")) if x]
+    runsc_argv += ["run", "--bundle=/home/dangerzone/dangerzone-image", "dangerzone"]
+    log(
+        "Running gVisor with command line: {}",
+        " ".join(shlex.quote(s) for s in runsc_argv),
     )
-)
-for key_val in oci_config["process"]["env"]:
-    not_forwarded_env.add(key_val[: key_val.index("=")])
-for key, val in os.environ.items():
-    if key in not_forwarded_env:
-        continue
-    oci_config["process"]["env"].append("%s=%s" % (key, val))
-if os.environ.get("RUNSC_DEBUG"):
-    log("Command inside gVisor sandbox: {}", command)
-    log("OCI config:")
-    json.dump(oci_config, sys.stderr, indent=2, sort_keys=True)
-    # json.dump doesn't print a trailing newline, so print one here:
-    log("")
-with open("/home/dangerzone/dangerzone-image/config.json", "w") as oci_config_out:
-    json.dump(oci_config, oci_config_out, indent=2, sort_keys=True)
+    runsc_process = subprocess.run(runsc_argv, check=False)
+    log("gVisor quit with exit code: {}", runsc_process.returncode)
+    return runsc_process.returncode
 
-# Run gVisor.
-runsc_argv = [
-    "/usr/bin/runsc",
-    "--rootless=true",
-    "--network=none",
-    "--root=/home/dangerzone/.containers",
-    # Disable DirectFS for to make the seccomp filter even stricter,
-    # at some performance cost.
-    "--directfs=false",
-]
-if os.environ.get("RUNSC_DEBUG"):
-    runsc_argv += ["--debug=true", "--alsologtostderr=true"]
-if os.environ.get("RUNSC_FLAGS"):
-    runsc_argv += [x for x in shlex.split(os.environ.get("RUNSC_FLAGS", "")) if x]
-runsc_argv += ["run", "--bundle=/home/dangerzone/dangerzone-image", "dangerzone"]
-log(
-    "Running gVisor with command line: {}", " ".join(shlex.quote(s) for s in runsc_argv)
-)
-runsc_process = subprocess.run(
-    runsc_argv,
-    check=False,
-)
-log("gVisor quit with exit code: {}", runsc_process.returncode)
 
-# We're done.
-sys.exit(runsc_process.returncode)
+if __name__ == "__main__":
+    sys.exit(main())
