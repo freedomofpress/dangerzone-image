@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "0 0 * * *" # Run every day at 00:00 UTC.
 
+permissions:
+  packages: write
+  actions: read # for detecting the Github Actions environment.
+  id-token: write # for creating OIDC tokens for signing.
+
 jobs:
   build-push-image:
     uses: ./.github/workflows/build-push.yml
