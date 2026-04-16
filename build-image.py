@@ -1,5 +1,4 @@
 import argparse
-import platform
 import secrets
 import subprocess
 import sys
@@ -7,10 +6,7 @@ from pathlib import Path
 
 BUILD_CONTEXT = "src"
 IMAGE_NAME = "ghcr.io/freedomofpress/dangerzone-alpha/v1"
-if platform.system() in ["Darwin", "Windows"]:
-    CONTAINER_RUNTIME = "docker"
-elif platform.system() == "Linux":
-    CONTAINER_RUNTIME = "podman"
+CONTAINER_RUNTIME = "podman"
 ANNOTATION_DATE = "rocks.dangerzone.debian_archive_date={date}"
 
 
@@ -70,7 +66,7 @@ def main():
     parser.add_argument(
         "--platform",
         default=None,
-        help=f"The platform for building the image (default: current platform)",
+        help="The platform for building the image (default: current platform)",
     )
     parser.add_argument(
         "--output",
