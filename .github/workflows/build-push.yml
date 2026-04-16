@@ -264,7 +264,7 @@ jobs:
 
       - name: Reproduce the same container image
         run: |
-          ./reproduce-image.py \
+          ./utils/reproduce-image.py \
             --runtime \
             docker \
             --debian-archive-date \
