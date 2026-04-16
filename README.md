@@ -4,13 +4,13 @@ This repository contains the dangerzone container image that is used to perform 
 
 ## Using the container image
 
-The image is published on a monthly basis on the container registry, alongside their Cosign signatures. 
+The image is published on a monthly basis on the container registry, alongside their Cosign signatures.
 Additionally, nightly and development branches are published under the `dangerzone-testing` namespace.
 
 | Channel | Location                               | Signed?    | Use it for  |
 | ------- | -------------------------------------- | ---------- | ----------- |
-| Stable  | `ghcr.io/freedomofpress/dangerzone/v1` | ✅ ([prod keys](/freedomofpress-dangerzone.pub))  | Production  |
-| Nightly | `ghcr.io/freedomofpress/dangerzone-testing/main/v1` | ✅ ([testing keys](/tests/assets/dangerzone-testing.pub))  | Development |
+| Stable  | [`ghcr.io/freedomofpress/dangerzone/v1`](https://ghcr.io/freedomofpress/dangerzone/v1) | ✅ ([prod keys](/freedomofpress-dangerzone.pub))  | Production  |
+| Nightly | [`ghcr.io/freedomofpress/dangerzone-testing/main/v1`](https://ghcr.io/freedomofpress/dangerzone-testing/main/v1) | ✅ ([testing keys](/tests/assets/dangerzone-testing.pub))  | Development |
 | Branch  | `ghcr.io/freedomofpress/dangerzone-testing/<branch-name>/v1` | ✅ ([testing keys](/tests/assets/dangerzone-testing.pub))  | Development |
 
 ## What this container provides
@@ -48,6 +48,16 @@ podman run \
     /usr/bin/python3 -m dangerzone.conversion.doc_to_pixels
 ```
 
+### Output Format
+
+The output of the container is streamed to `stdout` in a custom binary format:
+
+1.  **Total Pages**: A 4-byte unsigned integer representing the total number of pages in the converted document.
+2.  **For each page**:
+    a.  **Page Width**: A 4-byte unsigned integer representing the width of the page in pixels.
+    b.  **Page Height**: A 4-byte unsigned integer representing the height of the page in pixels.
+    c.  **Pixel Data**: bytes of raw RGB pixel data
+        - Length is `width` x `height` x 3 color channels
 
 ## dangerzone-insecure-conversion python package
 
@@ -71,3 +81,23 @@ uv run pytest --local
 # It's also possible to run tests in parallel if you have multiple cores:
 uv run --with pytest-xdist pytest -n 6
 ```
+
+## Building and Reproducing the Image
+
+To build the Dangerzone container image, use the `build-image.py` script:
+
+```bash
+python3 build-image.py [OPTIONS]
+```
+
+**Common Options:**
+*   `--platform <PLATFORM>`: Specify the build platform (e.g., `linux/amd64`, `linux/arm64`). Defaults to the current platform.
+*   `--runtime <RUNTIME>`: Specify the container runtime (`docker` or `podman`). Defaults to `podman`.
+*   `--debian-archive-date <YYYYMMDD>`: Use a specific Debian snapshot archive date for reproducibility.
+
+**Example:**
+```bash
+python3 build-image.py --platform linux/amd64 --debian-archive-date 20231026
+```
+
+To verify the reproducibility of a Dangerzone container image, follow [these instructions](docs/reproducibility.md).
