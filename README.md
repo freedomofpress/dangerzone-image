@@ -101,3 +101,5 @@ python3 build-image.py --platform linux/amd64 --debian-archive-date 20231026
 ```
 
 To verify the reproducibility of a Dangerzone container image, follow [these instructions](docs/reproducibility.md).
+
+DO NOT MERGE
