@@ -5,10 +5,6 @@ name: Publish image to testing repo from branch
 on:
   workflow_dispatch:
   push:
-    paths:
-      - Dockerfile
-      - build-image.py
-      - src/**
 
 permissions:
   packages: write
