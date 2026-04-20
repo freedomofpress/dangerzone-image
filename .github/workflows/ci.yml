@@ -22,11 +22,11 @@ jobs:
     name: Run tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
         with:
           python-version: "3.13"
           enable-cache: true
@@ -37,7 +37,7 @@ jobs:
 
       - name: Cache container image
         id: cache-container-image
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           key: v5-${{ steps.date.outputs.date }}-${{ hashFiles('Dockerfile', 'conversion/*.py', 'container_helpers/*', 'build-image.py') }}
           path: |

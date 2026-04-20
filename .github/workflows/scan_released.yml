@@ -18,11 +18,11 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       # NOTE: Scan first without failing, else we won't be able to read the scan
       # report.
       - name: Scan container image (no fail)
-        uses: anchore/scan-action@v7
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         id: scan_container
         with:
           image: "ghcr.io/freedomofpress/dangerzone/v1:latest"
@@ -33,7 +33,7 @@ jobs:
         run: cat ${{ steps.scan_container.outputs.sarif }}
 
       - name: Scan container image
-        uses: anchore/scan-action@v7
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:
           image: "ghcr.io/freedomofpress/dangerzone/v1:latest"
           fail-build: true
