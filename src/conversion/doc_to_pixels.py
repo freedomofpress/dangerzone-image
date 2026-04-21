@@ -256,7 +256,9 @@ class DocumentToPixels(DangerzoneConverter):
             mime = magic.Magic(mime=True)
             mime_type = mime.from_file("/tmp/input_file")
         except TypeError:
-            mime_type = magic.detect_from_filename("/tmp/input_file").mime_type
+            # The container installs Debian's python3-magic (file-magic), which
+            # exposes detect_from_filename instead of the Magic() constructor.
+            mime_type = magic.detect_from_filename("/tmp/input_file").mime_type  # ty: ignore[unresolved-attribute]
 
         return mime_type
 

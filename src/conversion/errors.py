@@ -25,7 +25,7 @@ class ConversionException(Exception):
 
     @classmethod
     def get_subclasses(cls) -> List[Type["ConversionException"]]:
-        subclasses = [cls]
+        subclasses: List[Type["ConversionException"]] = [cls]
         for subclass in cls.__subclasses__():
             subclasses += subclass.get_subclasses()
         return subclasses

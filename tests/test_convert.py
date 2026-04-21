@@ -102,6 +102,7 @@ async def run_container_conversion(
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await proc.communicate(input=doc.read_bytes())
+    assert proc.returncode is not None
     return proc.returncode, stdout, stderr
 
 
@@ -158,7 +159,9 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
 )
 @pytest.mark.asyncio
 async def test_bad_pdf(
-    request: pytest.FixtureRequest, bad_doc: Path, expected_error: type
+    request: pytest.FixtureRequest,
+    bad_doc: Path,
+    expected_error: type[errors.ConversionException],
 ) -> None:
     """Test that invalid documents raise the expected errors."""
     if request.config.getoption("--local"):

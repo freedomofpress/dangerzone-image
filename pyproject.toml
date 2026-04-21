@@ -33,3 +33,6 @@ target-version = "py39"
 
 [tool.ruff.lint]
 select = ["F", "I"]
+
+[tool.ty.src]
+exclude = ["utils"]
