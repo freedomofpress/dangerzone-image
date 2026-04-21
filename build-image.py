@@ -108,7 +108,7 @@ def main():
     image_id_path = Path("image-id.txt")
     if not args.dry:
         with open(image_id_path, "w") as f:
-            f.write(tag)
+            f.write(image_name_tagged)
 
     date_annotation = ANNOTATION_DATE.format(date=args.debian_archive_date)
     print("Will annotate the image with the following:")
