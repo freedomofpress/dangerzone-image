@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-import hashlib
 import json
 import logging
-import pathlib
 import platform
 import shutil
-import stat
 import subprocess
 import sys
-import urllib.request
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +51,7 @@ def parse_args():
     parser.add_argument(
         "--platform",
         default=None,
-        help=f"The platform for building the image (default: current platform)",
+        help="The platform for building the image (default: current platform)",
     )
     parser.add_argument(
         "--runtime",
@@ -125,7 +120,7 @@ def main():
     else:
         date = args.debian_archive_date
 
-    logger.info(f"Building container image")
+    logger.info("Building container image")
     build_image(
         args.platform,
         args.runtime,

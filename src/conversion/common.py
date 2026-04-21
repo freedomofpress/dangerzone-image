@@ -122,8 +122,8 @@ class DangerzoneConverter:
             self.read_stream(proc.stderr, stderr_callback)
         )
 
-        # Wait until the command has finished. Then, verify that the command
-        # has completed successfully. In any other case, raise an exception.
+        # Wait until the command has finished. Then, verify that the command has completed
+        # successfully. In any other case, raise an exception.
         ret = await proc.wait()
         if ret != 0:
             raise RuntimeError(error_message)

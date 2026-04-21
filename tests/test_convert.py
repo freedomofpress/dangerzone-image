@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 import pytest
+
 from conversion import errors
 from conversion.common import INT_BYTES
 from conversion.doc_to_pixels import DocumentToPixels

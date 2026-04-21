@@ -17,6 +17,8 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "ruff",
+    "ty",
 ]
 
 [build-system]
@@ -25,3 +27,9 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "conversion"
+
+[tool.ruff]
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["F", "I"]
