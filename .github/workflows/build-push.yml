@@ -330,18 +330,48 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+        with:
+          cosign-release: "v2.5.0"
+
       - name: Set base image
         run: |
           image_with_tag="${{ needs.merge.outputs.image }}"
           # Only keep the image name (strip the part after ":"
           echo "BASE_IMAGE=${image_with_tag%:*}" >> "$GITHUB_ENV"
 
-      - name: Capture previous latest
+      - name: Rotate or seed :old-latest
         run: |
+          # Rotate :old-latest only when the previous :latest differs from the
+          # new digest. Reproducible builds can produce the same digest across
+          # runs; rotating in that case would collapse :latest and :old-latest
+          # onto the same manifest and break the sandbox upgrade E2E test.
+          #
+          # For brand-new feature branches with no :latest yet, seed :old-latest
+          # by copying dangerzone-testing/main/v1:old-latest (signatures included)
+          # so the upgrade test has a realistic prior version to upgrade from.
           docker buildx imagetools inspect "$BASE_IMAGE:latest" --format '{{json .Manifest}}' > manifest || true
           if [ -s manifest ]; then
-            digest=$(jq -r .digest manifest)
-            docker buildx imagetools create -t "$BASE_IMAGE:old-latest" "$BASE_IMAGE@${digest}"
+            previous_digest=$(jq -r .digest manifest)
+            new_digest="${{ needs.merge.outputs.digest_root }}"
+            if [ "$previous_digest" != "$new_digest" ]; then
+              docker buildx imagetools create -t "$BASE_IMAGE:old-latest" "$BASE_IMAGE@${previous_digest}"
+            else
+              echo "Previous :latest already matches new digest ($new_digest); leaving :old-latest untouched."
+            fi
+          else
+            MAIN_BASE=$(echo "$BASE_IMAGE" | sed -E 's|(dangerzone-testing)/[^/]+/v1|\1/main/v1|')
+            if [ "$MAIN_BASE" = "$BASE_IMAGE" ]; then
+              echo "No :latest on $BASE_IMAGE and this IS the main image path; nothing to seed."
+            else
+              echo "No :latest on $BASE_IMAGE; seeding :old-latest from $MAIN_BASE:old-latest"
+              if ! cosign copy --force "$MAIN_BASE:old-latest" "$BASE_IMAGE:old-latest"; then
+                echo "ERROR: could not seed :old-latest from $MAIN_BASE:old-latest." >&2
+                echo "Ensure main's testing image has rotated :old-latest at least once." >&2
+                exit 1
+              fi
+            fi
           fi
 
       - name: Update latest tag
