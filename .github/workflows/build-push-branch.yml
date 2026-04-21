@@ -8,7 +8,7 @@ on:
     paths:
       - Dockerfile
       - build-image.py
-      - src/*
+      - src/**
 
 permissions:
   packages: write
