@@ -1,0 +1,2 @@
+#!/usr/bin/sh
+python -m dangerzone_insecure_converter.doc_to_pixels

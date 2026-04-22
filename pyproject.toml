@@ -12,6 +12,7 @@ dependencies = [
     "pymupdf",
     "python-magic",
 ]
+license-files = ["LICENSE"]
 
 [dependency-groups]
 dev = [
