@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Dangerzone Security Dashboard</title>
+
+    <!-- Template Metadata-->
+    <meta name="author" content="grype">
+    <meta name="version" content="1.0.0">
+
+    <!-- Source DataTables.js and its dependencies -->
+    <link href="https://cdn.datatables.net/v/dt/jq-3.7.0/jszip-3.10.1/dt-2.3.0/b-3.2.3/b-html5-3.2.3/r-3.0.4/datatables.min.css" rel="stylesheet" integrity="sha384-i3FrIG8iE4wl9Hmwo+yL2xgtj0L+/QgCSGfIAJbuoowqsGIdhIpg9ax2eizUyCZw" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js" integrity="sha384-VFQrHzqBh5qiJIU0uGU5CIW3+OWpdGGJM9LBnGbuIH2mkICcFZ7lPd/AAtI7SNf7" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js" integrity="sha384-/RlQG9uf0M2vcTw3CX7fbqgbj/h8wKxw7C3zu9/GxcBPRKOEcESxaxufwRXqzq6n" crossorigin="anonymous"></script>
+    <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/jszip-3.10.1/dt-2.3.0/b-3.2.3/b-html5-3.2.3/r-3.0.4/datatables.min.js" integrity="sha384-uD0xNCd/C2vKjG5NDZ8BdHFubelfW0p6XH+6n7crJnbQcPP6aUw5MJ3WfEZFz3bA" crossorigin="anonymous"></script>
+
+    <!-- Include Devicon -->
+    <link rel="stylesheet" type='text/css' href="https://cdn.jsdelivr.net/gh/devicons/devicon@2.16.0/devicon.min.css" />
+
+    <!-- Preload SVG icons used in CSS -->
+    <link rel="preload" href="https://api.iconify.design/noto:package.svg" as="image">
+    <link rel="preload" href="https://api.iconify.design/file-icons:alpine-linux.svg" as="image">
+    <link rel="preload" href="https://api.iconify.design/vscode-icons:file-type-excel.svg" as="image">
+    <link rel="preload" href="https://api.iconify.design/vscode-icons:file-type-pdf2.svg" as="image">
+
+    <!-- Font Awesome for search icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Google Fonts: Share Tech Mono for terminal feel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+
+    <!-- Hacker / Terminal Theme CSS Variables -->
+    <style>
+        :root {
+            --bg-color: #f7f4f1;
+            --text-color: #1b1b1b;
+            --text-dim: #6b5f58;
+            --container-bg: #ffffff;
+            --container-shadow: rgba(196, 53, 60, 0.2);
+            --header-bg: #f0e7e1;
+            --header-text: #1b1b1b;
+            --severity-box-text: rgba(27, 27, 27, 0.95);
+            --severity-box-shadow-hover: rgba(196, 53, 60, 0.35);
+            --input-border-color: #c4353c;
+            --input-bg-color: #ffffff;
+            --input-text-color: #1b1b1b;
+            --button-bg: #c4353c;
+            --button-hover-bg: #a92e34;
+            --button-text: #ffffff;
+            --table-border: #e0d6cf;
+            --table-header-bg: #f6eee9;
+            --table-header-text: #1b1b1b;
+            --table-row-hover-bg: #f9f2ed;
+            --link-color: #c4353c;
+            --link-visited-color: #8c2a2f;
+            --pill-text: #1b1b1b;
+            --glow: 0 0 8px rgba(196, 53, 60, 0.3), 0 0 2px rgba(196, 53, 60, 0.2);
+            --glow-strong: 0 0 15px rgba(196, 53, 60, 0.4), 0 0 5px rgba(196, 53, 60, 0.3);
+        }
+
+        /* DataTables dark mode adjustments */
+        .dataTables_wrapper .dataTables_length select,
+        .dataTables_wrapper .dt-search input,
+        .dataTables_wrapper .dataTables_info,
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            color: var(--text-color) !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+            color: #9b7f75 !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+             background-color: var(--table-row-hover-bg);
+             border-color: var(--table-border);
+             color: var(--text-color) !important;
+        }
+
+        #vulnerabilityTable a {
+            color: var(--link-color);
+        }
+        #vulnerabilityTable a:visited {
+             color: var(--link-visited-color);
+         }
+    </style>
+
+    <!-- Page & Main Container -->
+    <style>
+        body {
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            background-image:
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(196, 53, 60, 0.04) 2px,
+                    rgba(196, 53, 60, 0.04) 4px
+                );
+        }
+
+        /* Scanline overlay effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.03),
+                rgba(0, 0, 0, 0.03) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .main-container {
+            width: 90%;
+            max-width: 1200px;
+            background-color: var(--container-bg);
+            padding: 20px;
+            box-shadow: 0 0 30px var(--container-shadow), 0 0 60px rgba(196, 53, 60, 0.08);
+            border: 1px solid #e0d6cf;
+            border-radius: 4px;
+            margin: 20px;
+        }
+
+        a {
+            color: var(--link-color);
+            text-decoration: none;
+            text-shadow: var(--glow);
+        }
+        a:hover {
+            text-decoration: underline;
+            text-shadow: var(--glow-strong);
+        }
+        a:visited {
+            color: var(--link-visited-color);
+        }
+    </style>
+
+    <!-- Header Container -->
+    <style>
+        .heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            border: 1px solid #e0d6cf;
+            border-top: 3px solid #c4353c;
+            box-shadow: var(--glow);
+        }
+
+        .heading-left,
+        .heading-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .heading-right {
+            align-items: flex-end;
+            padding-right: 20px;
+            color: var(--header-text);
+        }
+
+        .heading-right img {
+            width: 70px;
+            height: auto;
+            filter: drop-shadow(0 0 8px #c4353c);
+        }
+
+        .heading-left h1,
+        .heading-left p {
+            padding-left: 20px;
+            margin: 4px 0;
+        }
+
+        .heading-left h1 {
+            font-family: 'VT323', monospace;
+            font-size: 2em;
+            letter-spacing: 3px;
+            text-shadow: var(--glow-strong);
+            text-transform: uppercase;
+        }
+
+        /* Blinking cursor effect */
+        .heading-left h1::after {
+            content: '_';
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .heading-left dl.report-details {
+            padding-left: 20px;
+            margin: 4px 0;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 2px 10px;
+            align-items: baseline;
+        }
+
+        .heading-left dt {
+            grid-column: 1;
+            font-weight: bold;
+            text-align: left;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-size: 0.8em;
+        }
+
+        .heading-left dd {
+            grid-column: 2;
+            margin: 0;
+            text-align: left;
+            word-break: break-all;
+        }
+
+        /* Terminal prompt prefix */
+        .heading-left dt::before {
+            content: '> ';
+            color: #c4353c;
+        }
+    </style>
+
+    <!-- View Switch -->
+    <style>
+        .view-switch {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .view-switch a {
+            padding: 6px 10px;
+            border: 1px solid var(--table-border);
+            border-radius: 4px;
+            background-color: var(--header-bg);
+            color: var(--text-color);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.75em;
+            text-decoration: none;
+        }
+
+        .view-switch a:hover {
+            text-shadow: none;
+            background-color: var(--table-row-hover-bg);
+        }
+
+        .view-switch a.active {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border-color: var(--button-bg);
+        }
+    </style>
+
+    <!-- Severity Information Container -->
+    <style>
+        .severity-info {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px;
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #e0d6cf;
+        }
+
+        .severity-box {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid transparent;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .severity-title {
+            font-size: 0.75em;
+            position: absolute;
+            bottom: 8px;
+            width: 100%;
+            color: rgba(0, 0, 0, 0.85);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .severity-count {
+            font-family: 'VT323', monospace;
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            color: var(--pill-text);
+            text-shadow: none;
+        }
+
+        .severity-box.active {
+            border: 2px solid #c4353c;
+            box-shadow: var(--glow);
+        }
+
+        #critical {
+            background-color: #cc0000;
+            box-shadow: 0 0 10px rgba(204,0,0,0.4);
+        }
+
+        #high {
+            background-color: #cc7700;
+            box-shadow: 0 0 10px rgba(204,119,0,0.4);
+        }
+
+        #medium {
+            background-color: #0077aa;
+            box-shadow: 0 0 10px rgba(0,119,170,0.4);
+        }
+
+        #low {
+            background-color: #2f6f91;
+            box-shadow: 0 0 10px rgba(47,111,145,0.4);
+        }
+
+        #unknown {
+            background-color: #444;
+            box-shadow: 0 0 10px rgba(68,68,68,0.4);
+        }
+
+        .severity-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px var(--severity-box-shadow-hover);
+        }
+    </style>
+
+    <!-- Table Control & Datatables Wrapper -->
+    <style>
+        .state-filter {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            border-radius: 4px;
+            border: 1px solid #e0d6cf;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .state-filter label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .state-filter input[type="checkbox"] {
+            accent-color: #c4353c;
+        }
+
+        .dataTables_wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            margin-bottom: 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            border: 1px solid #e0d6cf;
+        }
+
+        .dt-buttons {
+            order: 2;
+            flex-grow: 1;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding-right: 10px;
+        }
+
+        .dt-button {
+            background-color: var(--button-bg) !important;
+            color: var(--button-text) !important;
+            border: 1px solid #c4353c !important;
+            border-radius: 2px !important;
+            padding: 0 !important;
+            width: 36px !important;
+            height: 36px !important;
+            font-size: 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center;
+            cursor: pointer;
+            margin-left: 5px !important;
+            box-shadow: var(--glow);
+            transition: background-color 0.2s ease;
+            overflow: hidden;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .dt-button:hover {
+            background-color: var(--button-hover-bg) !important;
+            box-shadow: var(--glow-strong) !important;
+        }
+
+        .dt-button.buttons-pdf,
+        .dt-button.buttons-excel {
+            background-color: transparent !important;
+            border: 1px solid #c4353c !important;
+            box-shadow: none !important;
+        }
+
+        .dt-button.buttons-pdf:hover,
+        .dt-button.buttons-excel:hover {
+            background-color: rgba(196, 53, 60, 0.12) !important;
+            box-shadow: var(--glow) !important;
+        }
+
+        .dt-button.buttons-pdf .vscode-icons--file-type-pdf2,
+        .dt-button.buttons-excel .vscode-icons--file-type-excel {
+            width: 32px;
+            height: 32px;
+        }
+
+        .child-row-details {
+            padding: 10px;
+            margin-left: 25px;
+            background-color: var(--container-bg);
+            color: var(--text-color);
+            border-top: 1px solid var(--table-border);
+            margin-top: -1px;
+            white-space: normal !important;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .child-row-details b {
+            font-weight: bold;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+        .child-row-details ul {
+            list-style-type: none;
+            padding-left: 20px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+        .child-row-details ul li::before {
+            content: '> ';
+            color: var(--text-dim);
+        }
+
+        /* Search Bar */
+        .dataTables_wrapper .dt-search {
+            position: relative;
+        }
+
+        .dataTables_wrapper .dt-search .dt-input {
+            height: 36px;
+            width: 36px;
+            border-style: none;
+            padding: 5px 10px;
+            font-size: 14px;
+            letter-spacing: 1px;
+            outline: none;
+            border-radius: 2px;
+            transition: all 0.5s ease-in-out;
+            background-color: var(--button-bg);
+            padding-left: 10px;
+            padding-right: 30px;
+            color: var(--button-text);
+            vertical-align: middle;
+            cursor: pointer;
+            font-family: 'Share Tech Mono', monospace;
+            border: 1px solid #c4353c;
+            box-shadow: var(--glow);
+        }
+
+        .dataTables_wrapper .dt-search .dt-input::placeholder {
+            color: var(--text-dim);
+            opacity: 0.7;
+        }
+
+        .dataTables_wrapper .dt-search .dt-input:focus {
+            width: 250px;
+            border-radius: 2px;
+            background-color: var(--input-bg-color);
+            border: 1px solid var(--input-border-color);
+            color: var(--input-text-color);
+            cursor: text;
+            box-shadow: var(--glow-strong);
+        }
+
+        .dataTables_wrapper .dt-search > label {
+            position: absolute;
+            right: 0.1em;
+            top: 0;
+            height: 36px;
+            width: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--button-text);
+            font-size: 14px;
+            cursor: pointer;
+            pointer-events: none;
+            z-index: 2;
+            transition: color 0.3s ease-in-out;
+        }
+
+        .dataTables_wrapper .dt-search > label::before {
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            content: "\f002";
+        }
+
+        .dataTables_wrapper .dt-search .dt-input:focus + label {
+            color: var(--text-color);
+        }
+
+        .dataTables_wrapper .dt-search > label span {
+            display: none;
+        }
+    </style>
+
+    <!-- Table Container -->
+    <style>
+        .data-table {
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            padding: 20px;
+            border-radius: 4px;
+            overflow-x: auto;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            border: 1px solid #e0d6cf;
+        }
+
+        table.display {
+            width: 100%;
+            border-collapse: collapse;
+            color: var(--text-color);
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        th, td {
+            padding: 10px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--table-border);
+        }
+
+        th {
+            background-color: var(--table-header-bg);
+            font-weight: bold;
+            color: var(--table-header-text);
+            text-transform: uppercase;
+            font-size: 0.8em;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #c4353c;
+            text-shadow: var(--glow);
+        }
+
+        tr:hover {
+            background-color: var(--table-row-hover-bg);
+        }
+
+        table.display a {
+             color: var(--link-color);
+             text-shadow: var(--glow);
+        }
+
+        table.display a:visited {
+             color: var(--link-visited-color);
+        }
+
+        .fixed-in ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .fixed-in li {
+            padding: 0;
+            margin: 0;
+        }
+
+        .fixed-in li::before {
+            content: '+ ';
+            color: #c4353c;
+        }
+    </style>
+
+    <!-- Severity Coloring -->
+    <style>
+        .severity-pill,
+        .child-row-details .severity-pill {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 2px;
+            color: var(--pill-text);
+            text-align: center;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .critical, .child-row-details .critical {
+            background-color: #cc0000;
+            box-shadow: 0 0 6px rgba(204,0,0,0.6);
+            color: #fff;
+        }
+
+        .high, .child-row-details .high {
+            background-color: #cc7700;
+            box-shadow: 0 0 6px rgba(204,119,0,0.6);
+            color: #fff;
+        }
+
+        .medium, .child-row-details .medium {
+            background-color: #0077aa;
+            box-shadow: 0 0 6px rgba(0,119,170,0.6);
+            color: #fff;
+        }
+
+        .low, .child-row-details .low {
+            background-color: #2f6f91;
+            box-shadow: 0 0 6px rgba(47,111,145,0.5);
+            color: #fff;
+        }
+
+        .unknown, .child-row-details .unknown {
+            background-color: #333;
+            color: #888;
+        }
+    </style>
+
+    <!-- State Coloring -->
+    <style>
+        .state-pill,
+        .child-row-details .state-pill {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 2px;
+            color: #0a0a0a;
+            text-align: center;
+            white-space: nowrap;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .fixed, .child-row-details .fixed {
+            background-color: #cc0000;
+            color: #fff;
+            box-shadow: 0 0 6px rgba(204,0,0,0.5);
+        }
+
+        .not-fixed, .child-row-details .not-fixed {
+            background-color: #cc7700;
+            color: #fff;
+            box-shadow: 0 0 6px rgba(204,119,0,0.5);
+        }
+
+        .wont-fix, .child-row-details .wont-fix {
+            background-color: #7a5a5a;
+            color: #fff;
+            box-shadow: 0 0 6px rgba(122,90,90,0.5);
+        }
+    </style>
+
+    <!-- Package Type Icon Styling -->
+    <style>
+        .pkg-type-cell {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pkg-type-cell i,
+        .pkg-type-cell .icon-span {
+            font-size: 1.2em;
+            width: 1.2em;
+            text-align: center;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+
+        .iconify-noto--package {
+            display: inline-block;
+            width: 1.2em;
+            height: 1.2em;
+            vertical-align: middle;
+            background-color: transparent;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+            background-image: url('https://api.iconify.design/noto:package.svg');
+        }
+
+        .iconify-file-icons--alpine-linux {
+            display: inline-block;
+            width: 1.2em;
+            height: 1.2em;
+            background-color: #c4353c;
+            mask-image: url('https://api.iconify.design/file-icons:alpine-linux.svg');
+            mask-size: contain;
+            mask-repeat: no-repeat;
+            mask-position: center;
+        }
+
+        .vscode-icons--file-type-excel {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            vertical-align: middle;
+            background-color: transparent;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+            background-image: url('https://api.iconify.design/vscode-icons:file-type-excel.svg');
+        }
+
+        .vscode-icons--file-type-pdf2 {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            background-color: transparent;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+            background-image: url('https://api.iconify.design/vscode-icons:file-type-pdf2.svg');
+        }
+    </style>
+
+</head>
+{{/* Initialize counters */}}
+{{- $CountCritical := 0 }}
+{{- $CountHigh := 0 }}
+{{- $CountMedium := 0 }}
+{{- $CountLow := 0}}
+{{- $CountUnknown := 0 }}
+
+{{/* Create a list */}}
+{{- $FilteredMatches := list }}
+
+{{/* Loop through all vulns limit output and set count*/}}
+{{- range $vuln := .Matches }}
+    {{- if or (eq $vuln.Vulnerability.Severity "Critical") (eq $vuln.Vulnerability.Severity "High") (eq $vuln.Vulnerability.Severity "Medium") (eq $vuln.Vulnerability.Severity "Low") (eq $vuln.Vulnerability.Severity "Unknown") }}
+        {{- $FilteredMatches = append $FilteredMatches $vuln }}
+        {{- if eq $vuln.Vulnerability.Severity "Critical" }}
+            {{- $CountCritical = add $CountCritical 1 }}
+        {{- else if eq $vuln.Vulnerability.Severity "High" }}
+            {{- $CountHigh = add $CountHigh 1 }}
+        {{- else if eq $vuln.Vulnerability.Severity "Medium" }}
+            {{- $CountMedium = add $CountMedium 1 }}
+        {{- else if eq $vuln.Vulnerability.Severity "Low" }}
+            {{- $CountLow = add $CountLow 1 }}
+        {{- else }}
+            {{- $CountUnknown = add $CountUnknown 1 }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+
+<body>
+    <div class="main-container">
+        <div class="heading">
+            <div class="heading-left">
+                <h1 class="report-title">Dangerzone Security Dashboard</h1>
+                <dl class="report-details">
+                    <dt>Target</dt>
+                    <dd id="nameValue"> {{- if eq (.Source.Type) "image" -}} {{.Source.Target.UserInput}}
+                        {{- else if eq (.Source.Type) "directory" -}} {{.Source.Target}}
+                        {{- else if eq (.Source.Type) "file" -}} {{.Source.Target}}
+                        {{- else -}} unknown
+                        {{- end -}}</dd>
+
+                    <dt>Date</dt>
+                    <dd>
+                        <span id="dateElement">{{.Descriptor.Timestamp}}</span>
+                        <span id="prettyDateElement" style="display: none;"></span>
+                    </dd>
+                </dl>
+            </div>
+            <div class="heading-right">
+                <img src="https://raw.githubusercontent.com/freedomofpress/dangerzone/main/share/icon.png"
+                    alt="Dangerzone Logo">
+            </div>
+        </div>
+        <div class="view-switch" role="navigation" aria-label="Report view">
+            <a href="index.html" data-view="latest">Latest</a>
+            <a href="nightly.html" data-view="nightly">Nightly</a>
+        </div>
+        <div class="severity-info">
+            <div class="severity-box" id="critical">
+                <div class="severity-title">Critical</div>
+                <div class="severity-count" id="criticalCount">{{ $CountCritical }}</div>
+            </div>
+            <div class="severity-box" id="high">
+                <div class="severity-title">High</div>
+                <div class="severity-count" id="highCount">{{ $CountHigh }}</div>
+            </div>
+            <div class="severity-box" id="medium">
+                <div class="severity-title">Medium</div>
+                <div class="severity-count" id="mediumCount">{{ $CountMedium }}</div>
+            </div>
+            <div class="severity-box" id="low">
+                <div class="severity-title">Low</div>
+                <div class="severity-count" id="lowCount">{{ $CountLow }}</div>
+            </div>
+            <div class="severity-box" id="unknown">
+                <div class="severity-title">Unknown</div>
+                <div class="severity-count" id="unknownCount">{{ $CountUnknown }}</div>
+            </div>
+        </div>
+        <div class="state-filter">
+            <label>
+                <input type="checkbox" id="toggleWontFix">
+                Hide wont-fix
+            </label>
+        </div>
+        <div class="data-table">
+            <table id="vulnerabilityTable" class="display nowrap" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Version</th>
+                        <th>Type</th>
+                        <th>Vulnerability</th>
+                        <th>Severity</th>
+                        <th>State</th>
+                        <th>Fixed In</th>
+                        <th>Description</th>
+                        <th>Related URLs</th>
+                        <th>PURL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{- range $FilteredMatches }}
+                    <tr>
+                        <td>{{.Artifact.Name}}</td>
+                        <td>{{.Artifact.Version}}</td>
+                        <td>{{.Artifact.Type}}</td>
+                        <td>
+                            <a href="{{.Vulnerability.DataSource}}">{{.Vulnerability.ID}}</a>
+                        </td>
+                        <td>{{.Vulnerability.Severity}}</td>
+                        <td>{{.Vulnerability.Fix.State}}</td>
+                        <td>
+                            {{- if .Vulnerability.Fix.Versions }}
+                            <ul>
+                                {{- range .Vulnerability.Fix.Versions }}
+                                <li>{{ . }}</li>
+                                {{- end }}
+                            </ul>
+                            {{- else }}
+                            N/A
+                            {{- end }}
+                        </td>
+                        <td>{{html .Vulnerability.Description}}</td>
+                        <td>{{ toJson .Vulnerability.URLs }}</td>
+                        <td>{{ .Artifact.PURL }}</td>
+                    </tr>
+                    {{- end }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+
+    // ================================================
+    // DataTables Core Logic & Callbacks
+    // ================================================
+
+    let wontFixFilterFn;
+
+    function initDataTable() {
+        const tableElement = $('#vulnerabilityTable');
+
+        if ($.fn.dataTable.isDataTable(tableElement)) {
+            tableElement.DataTable().destroy();
+        }
+
+        const table = tableElement.DataTable({
+            responsive: {
+                details: {
+                    type: 'inline',
+                    renderer: renderChildRowDetailsDt
+                }
+            },
+            dom: '<"dataTables_wrapper"Bf>t<"dataTables_control"ip>',
+
+            language: {
+                search: "",
+                searchPlaceholder: "Search vulnerabilities..."
+            },
+
+            order: [[0, 'asc']],
+            columnDefs: getColumnDefsDt(),
+
+            initComplete: function(settings, json) {
+                setDynamicPageLengthDt(this.api());
+            },
+
+            drawCallback: function (settings) {
+                const api = this.api();
+                const pageInfo = api.page.info();
+                const controlsWrapper = $(api.table().container()).find('.dataTables_control');
+                if (controlsWrapper.length) {
+                     controlsWrapper.toggle(pageInfo.pages > 1);
+                }
+                updateSeverityCounts(api);
+            },
+
+            buttons: [
+                {
+                    extend: 'pdfHtml5',
+                    text: '<span class="vscode-icons--file-type-pdf2"></span>',
+                    titleAttr: 'Export to PDF',
+                    title: function () { return getReportMetadata().title; },
+                    messageTop: function () { return getReportMetadata().message; },
+                    filename: function () {
+                        return `vulnerability-report-${getReportMetadata().safeName}`;
+                    },
+                    exportOptions: {
+                        columns: [
+                            'Name:name',
+                            'Version:name',
+                            'Type:name',
+                            'Vulnerability:name',
+                            'Severity:name',
+                            'State:name',
+                            'Fixed In:name'
+                        ]
+                    },
+                    customize: function (doc) {
+                        doc.styles.tableHeader.alignment = 'left';
+                        doc.defaultStyle.alignment = 'left';
+                        doc.content[doc.content.length - 1].table.widths = ['*', 'auto', 'auto', '*', 'auto', 'auto', '*'];
+                    }
+                },
+                {
+                    extend: 'excelHtml5',
+                    text: '<span class="vscode-icons--file-type-excel"></span>',
+                    titleAttr: 'Export to Excel',
+                    title: function () { return getReportMetadata().title; },
+                    messageTop: function () { return getReportMetadata().message; },
+                    filename: function () {
+                        return `vulnerability-report-${getReportMetadata().safeName}`;
+                    },
+                    exportOptions: {
+                         columns: [
+                            'Name:name',
+                            'Version:name',
+                            'Type:name',
+                            'Vulnerability:name',
+                            'Severity:name',
+                            'State:name',
+                            'Fixed In:name',
+                            'Related URLs:name',
+                            'PURL:name'
+                        ]
+                    }
+                }
+            ]
+        });
+
+        initSeverityFilteringDt(table);
+        initStateFilteringDt(table);
+
+         const dtInstance = table;
+         const debouncedPageLengthHandler = debounce(function() {
+             if ($.fn.dataTable.isDataTable(tableElement)) {
+                setDynamicPageLengthDt(dtInstance);
+             }
+        }, 250);
+
+        window.addEventListener('resize', debouncedPageLengthHandler);
+    }
+
+    function getColumnDefsDt() {
+        return [
+            {
+                name: 'Name',
+                targets: 0,
+                searchable: true,
+                responsivePriority: 1
+            },
+            {
+                name: 'Version',
+                targets: 1,
+                searchable: true,
+                responsivePriority: 5
+            },
+            {
+                name: 'Type',
+                targets: 2,
+                render: function (data, type, row) { return data; },
+                createdCell: function (td, cellData, rowData, row, col) {
+                    $(td).html(formatTypeCell(cellData));
+                },
+                searchable: false,
+                responsivePriority: 6
+            },
+            {
+                name: 'Vulnerability',
+                targets: 3,
+                searchable: true,
+                responsivePriority: 2
+            },
+            {
+                name: 'Severity',
+                targets: 4,
+                render: function (data, type, row) { return data; },
+                createdCell: function (td, cellData, rowData, row, col) {
+                    $(td).html(formatPill(cellData, 'severity'));
+                },
+                searchable: true,
+                responsivePriority: 3
+            },
+            {
+                name: 'State',
+                targets: 5,
+                render: function (data, type, row) { return data; },
+                createdCell: function (td, cellData, rowData, row, col) {
+                    $(td).html(formatPill(cellData, 'state'));
+                },
+                searchable: true,
+                responsivePriority: 4
+            },
+            {
+                name: 'Fixed In',
+                targets: 6,
+                createdCell: function (td, cellData, rowData, row, col) {
+                    $(td).addClass('fixed-in');
+                },
+                searchable: true,
+                responsivePriority: 7
+            },
+            {
+                name: 'Description',
+                targets: 7,
+                searchable: true,
+                className: 'none',
+            },
+            {
+                name: 'Related URLs',
+                targets: 8,
+                searchable: false,
+                className: 'none',
+            },
+            {
+                name: 'PURL',
+                targets: 9,
+                searchable: false,
+                className: 'none',
+            },
+        ];
+    }
+
+    function renderChildRowDetailsDt( api, rowIndex, columns ) {
+        let finalHtml = '';
+
+        columns.forEach(function(col) {
+            if (col.hidden) {
+                const index = col.columnIndex;
+                const title = col.title;
+                const data = api.cell(rowIndex, index).data();
+
+                let contentHtml = '';
+
+                switch (index) {
+                    case 2:
+                        contentHtml = formatTypeCell(data);
+                        break;
+                    case 4:
+                        contentHtml = formatPill(data, 'severity');
+                        break;
+                    case 5:
+                        contentHtml = formatPill(data, 'state');
+                        break;
+                     case 7:
+                         contentHtml = data ? String(data) : '';
+                         break;
+                    case 8:
+                        contentHtml = formatUrlList(data);
+                        break;
+                    default:
+                         if (data !== null && data !== undefined) {
+                             contentHtml = String(data);
+                         }
+                         break;
+                }
+
+                if (contentHtml) {
+                    finalHtml += `<div class="child-row-details"><b>${title}</b><br>${contentHtml}</div>`;
+                }
+            }
+        });
+
+        return finalHtml ? finalHtml : false;
+    }
+
+    function initSeverityFilteringDt(table) {
+        let activeSeverityFilters = [];
+        const severityBoxes = $('.severity-box');
+
+        severityBoxes.on('click', function () {
+            const clickedBox = $(this);
+            const severity = clickedBox.find('.severity-title').text().trim();
+            const severityIndex = activeSeverityFilters.indexOf(severity);
+
+            if (severityIndex > -1) {
+                activeSeverityFilters.splice(severityIndex, 1);
+                clickedBox.removeClass('active');
+            } else {
+                activeSeverityFilters.push(severity);
+                clickedBox.addClass('active');
+            }
+
+            table.search('').columns().search('');
+
+            if (activeSeverityFilters.length > 0) {
+                const filterRegex = activeSeverityFilters.map(sev => `^${sev}$`).join('|');
+                table.column(4).search(filterRegex, true, false);
+            } else {
+                table.column(4).search('');
+            }
+
+            table.draw();
+        });
+    }
+
+    function initStateFilteringDt(table) {
+        const toggle = document.getElementById('toggleWontFix');
+
+        if (!toggle) {
+            return;
+        }
+
+        if (wontFixFilterFn) {
+            const index = $.fn.dataTable.ext.search.indexOf(wontFixFilterFn);
+            if (index > -1) {
+                $.fn.dataTable.ext.search.splice(index, 1);
+            }
+        }
+
+        wontFixFilterFn = function(settings, data) {
+            if (settings.nTable !== table.table().node()) {
+                return true;
+            }
+
+            if (!toggle.checked) {
+                return true;
+            }
+
+            const stateValue = data[5];
+            if (!stateValue) {
+                return true;
+            }
+
+            const normalized = String(stateValue).toLowerCase();
+            return normalized !== 'wont-fix' && normalized !== 'wontfix';
+        };
+
+        $.fn.dataTable.ext.search.push(wontFixFilterFn);
+
+        toggle.onchange = function() {
+            table.draw();
+        };
+
+        if (toggle.checked) {
+            table.draw();
+        }
+    }
+
+    function updateSeverityCounts(table) {
+        const counts = {
+            'Critical': 0,
+            'High': 0,
+            'Medium': 0,
+            'Low': 0,
+            'Unknown': 0
+        };
+        const severityKeyMap = {
+            'critical': 'Critical',
+            'high': 'High',
+            'medium': 'Medium',
+            'low': 'Low',
+            'unknown': 'Unknown'
+        };
+        const rows = table.rows({ filter: 'applied' }).data();
+
+        for (let i = 0; i < rows.length; i += 1) {
+            const rawValue = rows[i][4];
+            const normalized = String(rawValue || '')
+                .replace(/<[^>]*>/g, '')
+                .trim()
+                .toLowerCase();
+            const severity = severityKeyMap[normalized] || 'Unknown';
+            counts[severity] += 1;
+        }
+
+        const countMap = {
+            'Critical': 'criticalCount',
+            'High': 'highCount',
+            'Medium': 'mediumCount',
+            'Low': 'lowCount',
+            'Unknown': 'unknownCount'
+        };
+
+        Object.entries(countMap).forEach(([severity, id]) => {
+            const elem = document.getElementById(id);
+            if (elem) {
+                elem.textContent = counts[severity];
+            }
+        });
+    }
+
+    function setDynamicPageLengthDt(table) {
+        try {
+            const tableWrapper = table.table().container();
+            const tableBody = table.table().body();
+            const controls = $(tableWrapper).find('.dataTables_control')[0];
+
+            if (!tableWrapper || !tableBody || !tableBody.rows.length) {
+                return;
+            }
+
+            const firstRow = tableBody.rows[0];
+            const rowHeight = firstRow.offsetHeight;
+
+            if (!rowHeight || rowHeight <= 0) {
+                return;
+            }
+
+            const controlsHeight = controls ? $(controls).outerHeight(true) : 0;
+            const tableBodyTopOffset = tableBody.getBoundingClientRect().top;
+            const verticalBuffer = 60;
+
+            const availableHeight = window.innerHeight - tableBodyTopOffset - controlsHeight - verticalBuffer;
+
+            if (availableHeight <= 0) {
+                return;
+            }
+
+            const calculatedNumberOfRows = Math.floor(availableHeight / rowHeight);
+            const numberOfRowsToShow = Math.max(1, calculatedNumberOfRows);
+
+            const currentPageLength = table.page.len();
+            if (currentPageLength !== numberOfRowsToShow) {
+                table.page.len(numberOfRowsToShow).draw(false);
+            }
+
+        } catch (error) {
+            console.error("Error calculating page length:", error);
+        }
+    }
+
+    // ================================================
+    // UI Formatting & Utility Helpers
+    // ================================================
+
+    function renderFormattedTimestamp() {
+        const originalDateElement = document.getElementById("dateElement");
+        const prettyDateElement = document.getElementById("prettyDateElement");
+
+        if (!originalDateElement || !prettyDateElement) {
+            console.error("prettyTimestamp: Date elements not found.");
+            return;
+        }
+
+        const dateString = originalDateElement.textContent;
+        if (!dateString) {
+            prettyDateElement.textContent = 'N/A';
+            prettyDateElement.style.display = '';
+            originalDateElement.style.display = 'none';
+            return;
+        }
+
+        try {
+            const date = new Date(dateString);
+
+            if (isNaN(date.getTime())) {
+                prettyDateElement.textContent = 'Invalid Date';
+                prettyDateElement.style.display = '';
+                originalDateElement.style.display = 'none';
+                return;
+            }
+
+            const formattedDate = date.toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+            });
+
+            const formattedTime = date.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+            });
+
+            prettyDateElement.textContent = `${formattedDate} at ${formattedTime}`;
+            originalDateElement.style.display = 'none';
+            prettyDateElement.style.display = '';
+
+        } catch (error) {
+             console.error("prettyTimestamp: Error formatting date:", error);
+             prettyDateElement.textContent = 'Error';
+             prettyDateElement.style.display = '';
+             originalDateElement.style.display = 'none';
+        }
+    }
+
+    function setViewSwitchActive() {
+        const switcher = document.querySelector('.view-switch');
+        if (!switcher) {
+            return;
+        }
+
+        const path = window.location.pathname || '';
+        const activeView = path.endsWith('nightly.html') ? 'nightly' : 'latest';
+
+        switcher.querySelectorAll('a[data-view]').forEach(link => {
+            if (link.dataset.view === activeView) {
+                link.classList.add('active');
+            }
+        });
+    }
+
+    function getReportMetadata() {
+        const titleElem = document.querySelector('.report-title');
+        const nameElem = document.getElementById('nameValue');
+        const typeElem = document.getElementById('typeValue');
+        const checksumElem = document.getElementById('checksumValue');
+        const dateElem = document.getElementById('prettyDateElement');
+
+        const title = titleElem ? titleElem.textContent.trim() : 'Dangerzone Security Dashboard';
+        const name = nameElem ? nameElem.textContent.trim() : 'N/A';
+        const type = typeElem ? typeElem.textContent.trim() : 'N/A';
+        const checksum = checksumElem ? checksumElem.textContent.trim() : 'N/A';
+        const dateText = dateElem ? dateElem.textContent.trim() : 'N/A';
+
+        const safeName = name.replace(/[^a-z0-9._-]+/gi, '_').replace(/_+/g, '_');
+
+        let message = `Target: ${name}\n`;
+        message += `Type: ${type}\n`;
+        if (checksumElem && checksum !== 'N/A') {
+            message += `Checksum: ${checksum}\n`;
+        }
+        message += `Date: ${dateText}\n\n`;
+
+        return {
+            title,
+            message,
+            name,
+            safeName
+        };
+    }
+
+    function formatPill(data, type) {
+        const severityClasses = {'Critical': 'critical','High': 'high','Medium': 'medium','Low': 'low','Unknown': 'unknown'};
+        const stateClasses = {'fixed': 'fixed','not-fixed': 'not-fixed','unknown': 'unknown','wont-fix': 'wont-fix'};
+
+        let baseClass = '';
+        let specificClass = '';
+        let text = data || 'Unknown';
+
+        if (type === 'severity') {
+            baseClass = 'severity-pill';
+            specificClass = severityClasses[data] || 'unknown';
+        } else if (type === 'state') {
+            baseClass = 'state-pill';
+            specificClass = stateClasses[String(data).toLowerCase()] || 'unknown';
+        } else {
+            console.warn(`formatPill: Unknown type "${type}" for data "${data}"`);
+            return text;
+        }
+
+        return `<span class="${baseClass} ${specificClass}">${text}</span>`;
+    }
+
+    function formatUrlList(data) {
+        let urls = [];
+        try {
+            if (data && typeof data === 'string') {
+                urls = JSON.parse(data);
+            }
+        } catch (error) {
+            console.error("Failed to parse Related URLs JSON:", data, error);
+            urls = [];
+        }
+
+        let listHtml = '';
+        if (Array.isArray(urls) && urls.length > 0) {
+            listHtml += '<ul>';
+            urls.forEach(url => {
+                if (url && typeof url === 'string') {
+                    if (url.startsWith('http://') || url.startsWith('https://')) {
+                        listHtml += `<li><a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></li>`;
+                    } else {
+                        listHtml += `<li>${url}</li>`;
+                    }
+                }
+            });
+            listHtml += '</ul>';
+        }
+        return listHtml;
+    }
+
+    function debounce(func, wait, immediate = false) {
+        let timeout;
+
+        return function executedFunction() {
+            const context = this;
+            const args = arguments;
+
+            const later = function() {
+                timeout = null;
+                if (!immediate) {
+                    func.apply(context, args);
+                }
+            };
+
+            const callNow = immediate && !timeout;
+
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+
+            if (callNow) {
+                func.apply(context, args);
+            }
+        };
+    };
+
+    const packageTypeIcons = {
+        'alpm': { type: 'icon', class: 'devicon-archlinux-plain colored' },
+        'apk': { type: 'fallback', class: 'iconify-file-icons--alpine-linux' },
+        'cocoapods': { type: 'icon', class: 'devicon-apple-original colored' },
+        'composer': { type: 'icon', class: 'devicon-composer-line colored' },
+        'conan': { type: 'icon', class: 'devicon-cplusplus-plain' },
+        'deb': { type: 'icon', class: 'devicon-debian-plain colored' },
+        'dotnet': { type: 'icon', class: 'devicon-dotnetcore-plain colored' },
+        'gem': { type: 'icon', class: 'devicon-ruby-plain colored' },
+        'go-module': { type: 'icon', class: 'devicon-go-original-wordmark colored' },
+        'haskell': { type: 'icon', class: 'devicon-haskell-plain colored' },
+        'hex': { type: 'icon', class: 'devicon-elixir-plain colored' },
+        'java': { type: 'icon', class: 'devicon-java-plain colored' },
+        'jenkins-plugin': { type: 'icon', class: 'devicon-jenkins-line' },
+        'linux-kernel-module': { type: 'icon', class: 'devicon-linux-plain colored' },
+        'lua': { type: 'icon', class: 'devicon-lua-plain colored' },
+        'npm': { type: 'icon', class: 'devicon-npm-original-wordmark colored' },
+        'nix': { type: 'icon', class: 'devicon-nixos-plain colored' },
+        'portage': { type: 'icon', class: 'devicon-gentoo-plain colored' },
+        'pub': { type: 'icon', class: 'devicon-dart-plain colored' },
+        'python': { type: 'icon', class: 'devicon-python-plain colored' },
+        'rpm': { type: 'icon', class: 'devicon-redhat-plain colored' },
+        'rust-crate': { type: 'icon', class: 'devicon-rust-plain colored' },
+        'swift': { type: 'icon', class: 'devicon-swift-plain colored' },
+        'wordpress-plugin': { type: 'icon', class: 'devicon-wordpress-plain colored' },
+        'github-action': { type: 'icon', class: 'devicon-github-original colored' },
+        'binary': { type: 'fallback', class: 'iconify-noto--package' },
+        'buildroot': { type: 'fallback', class: 'iconify-noto--package' },
+        'graalvm-native-image': { type: 'fallback', class: 'iconify-noto--package' },
+        'kb': { type: 'icon', class: 'devicon-windows11-original colored' },
+    };
+
+    function formatTypeCell(data) {
+        const typeKey = data ? String(data).toLowerCase() : 'unknown';
+        const iconInfo = packageTypeIcons[typeKey];
+        const fallbackInfo = { type: 'fallback', class: 'noto--package' };
+        const chosenInfo = iconInfo || fallbackInfo;
+
+        let iconHtml = '';
+        if (chosenInfo.type === 'icon') {
+            iconHtml = `<i class="${chosenInfo.class}"></i>`;
+        } else {
+            iconHtml = `<span class="icon-span ${chosenInfo.class}"></span>`;
+        }
+
+        return `<span class="pkg-type-cell">${iconHtml}<span>${data}</span></span>`;
+    }
+
+    // ================================================
+    // Main Execution
+    // ================================================
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const headerInfo = getReportMetadata();
+        if (headerInfo && headerInfo.safeName && headerInfo.safeName !== 'N_A') {
+            document.title = `Dangerzone Security Dashboard (${headerInfo.safeName})`;
+        } else {
+            document.title = `Dangerzone Security Dashboard`;
+        }
+
+        renderFormattedTimestamp();
+        setViewSwitchActive();
+        initDataTable();
+    });
+
+    </script>
+
+</body>
+
+</html>
