@@ -1,5 +1,5 @@
 [project]
-name = "dangerzone-insecure-conversion"
+name = "dangerzone-insecure-converter"
 
 version = "1.0.0"
 authors = [
@@ -24,9 +24,6 @@ dev = [
 [build-system]
 requires = ["uv_build>=0.10.7,<0.11.0"]
 build-backend = "uv_build"
-
-[tool.uv.build-backend]
-module-name = "conversion"
 
 [tool.ruff]
 target-version = "py39"

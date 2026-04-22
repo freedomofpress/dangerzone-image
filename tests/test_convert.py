@@ -6,9 +6,9 @@ from typing import List, Tuple
 
 import pytest
 
-from conversion import errors
-from conversion.common import INT_BYTES
-from conversion.doc_to_pixels import DocumentToPixels
+from dangerzone_insecure_converter import errors
+from dangerzone_insecure_converter.common import INT_BYTES
+from dangerzone_insecure_converter.doc_to_pixels import DocumentToPixels
 
 from .conftest import TEST_DOCS_DIRECTORY, for_each_doc
 
