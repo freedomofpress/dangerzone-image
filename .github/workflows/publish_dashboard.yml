@@ -1,0 +1,107 @@
+# Nightly vulnerability scan of the container image built from this branch's
+# `main`, and of the latest released image. Renders HTML reports with grype's
+# template output and publishes them to GitHub Pages at
+# https://cves.dangerzone.rocks.
+name: Publish security dashboard
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Run every day at 02:00 UTC.
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Allow only one concurrent deployment, skipping runs queued between the run
+# in-progress and latest queued. However, do NOT cancel in-progress runs as we
+# want to allow these deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Grype HTML reports
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Build container image from main
+        run: |
+          python3 build-image.py \
+            --debian-archive-date $(date "+%Y%m%d") \
+            --runtime docker
+          docker load -i container.tar
+
+      - name: Get image ref
+        id: image
+        run: echo "ref=$(cat image-id.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate HTML report (main build)
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          grype "$IMAGE_REF" \
+            --config .grype.yaml \
+            --output template \
+            --template templates/html.tmpl \
+            --file nightly.html
+
+      - name: Generate HTML report (released :latest)
+        run: |
+          grype ghcr.io/freedomofpress/dangerzone/v1:latest \
+            --config .grype.yaml \
+            --output template \
+            --template templates/html.tmpl \
+            --file report.html
+
+      - name: Upload reports
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: security-report
+          path: |
+            report.html
+            nightly.html
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-24.04
+    needs: scan
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download reports
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: security-report
+
+      - name: Assemble site
+        run: |
+          mv report.html index.html
+          echo "cves.dangerzone.rocks" > CNAME
+
+      - name: Setup Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
