@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 BUILD_CONTEXT = "src"
-IMAGE_NAME = "ghcr.io/freedomofpress/dangerzone-alpha/v1"
+IMAGE_NAME = "ghcr.io/freedomofpress/dangerzone/v1"
 CONTAINER_RUNTIME = "podman"
 ANNOTATION_DATE = "rocks.dangerzone.debian_archive_date={date}"
 
