@@ -145,7 +145,7 @@ ignore:
   # In GnuPG before 2.4.9, armor_filter in g10/armor.c has two increments of an
   # index variable where one is intended, leading to an out-of-bounds write for
   # crafted input. (For ExtendedLTS, 2.2.51 and later are fixed versions.)
-  # 
+  #
   # Debian Tracker: https://security-tracker.debian.org/tracker/CVE-2025-68973
   #
   # Verdict: the container doesn't use GPG itself and so is not affected.
@@ -185,3 +185,20 @@ ignore:
   # processing documents.
   - vulnerability: CVE-2026-6100
   - vulnerability: GHSA-pg25-7cx5-cvcm
+
+  # CVE-2026-5450
+  # ==============
+  #
+  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-5450
+  #
+  # The `scanf` function of glibc can trigger a heap buffer overflow if:
+  # * a program uses it with `%mc` argument and
+  # * the width specifier is > 1024
+  #
+  # Verdict: Dangerzone is not affected because as the glibc maintainers point
+  # out "[...] The "%[width]mc" format specifier does not appear to have notable
+  # use in major Linux-based OS distributions" [1]. It's also considered a minor
+  # issue in Debian and marked as "wont-fix".
+  #
+  # [1]: https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0009
+  - vulnerability: CVE-2026-5450
