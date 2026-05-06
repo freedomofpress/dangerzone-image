@@ -1,0 +1,105 @@
+{
+  "assets": {
+    "cosign": {
+      "linux/amd64": {
+        "repo": "sigstore/cosign",
+        "download_url": "https://github.com/sigstore/cosign/releases/download/v2.6.3/cosign-linux-amd64",
+        "version": "2.6.3",
+        "checksum": "7c78a7f2efc00088bd788a758db6e0928e79f3e0eb83eb5d3c499ed98da4c4f4",
+        "executable": true,
+        "destination": "helpers/cosign",
+        "extract": false
+      },
+      "linux/arm64": {
+        "repo": "sigstore/cosign",
+        "download_url": "https://github.com/sigstore/cosign/releases/download/v2.6.3/cosign-linux-arm64",
+        "version": "2.6.3",
+        "checksum": "b7c23659a50a59fd8eec44b87188e9062157d0c87796cac7b38727e5390c4917",
+        "executable": true,
+        "destination": "helpers/cosign",
+        "extract": false
+      },
+      "darwin/amd64": {
+        "repo": "sigstore/cosign",
+        "download_url": "https://github.com/sigstore/cosign/releases/download/v2.6.3/cosign-darwin-amd64",
+        "version": "2.6.3",
+        "checksum": "5715d61dd00a9b6dcb344de14910b434145855b7f82690b94183c553ac1b68be",
+        "executable": true,
+        "destination": "helpers/cosign",
+        "extract": false
+      },
+      "darwin/arm64": {
+        "repo": "sigstore/cosign",
+        "download_url": "https://github.com/sigstore/cosign/releases/download/v2.6.3/cosign-darwin-arm64",
+        "version": "2.6.3",
+        "checksum": "ff497a698f125f3130b04f000b2cb0dd163bcaf00b5e776ef536035e6d0b3f3e",
+        "executable": true,
+        "destination": "helpers/cosign",
+        "extract": false
+      }
+    },
+    "crane": {
+      "linux/amd64": {
+        "repo": "google/go-containerregistry",
+        "download_url": "https://github.com/google/go-containerregistry/releases/download/v0.21.5/go-containerregistry_Linux_x86_64.tar.gz",
+        "version": "0.21.5",
+        "checksum": "9f823ae5ee25803161110f957b5fd4538f714d40cdf25dacb4914fefafd246bf",
+        "executable": true,
+        "destination": "helpers/crane",
+        "extract": {
+          "globs": [
+            "crane"
+          ],
+          "flatten": true,
+          "filetype": "tar.gz"
+        }
+      },
+      "linux/arm64": {
+        "repo": "google/go-containerregistry",
+        "download_url": "https://github.com/google/go-containerregistry/releases/download/v0.21.5/go-containerregistry_Linux_arm64.tar.gz",
+        "version": "0.21.5",
+        "checksum": "3a47c6da5a0ba1ca7a93def41036d8f262a2160799e5d4ca25dba3cfa47dab41",
+        "executable": true,
+        "destination": "helpers/crane",
+        "extract": {
+          "globs": [
+            "crane"
+          ],
+          "flatten": true,
+          "filetype": "tar.gz"
+        }
+      },
+      "darwin/amd64": {
+        "repo": "google/go-containerregistry",
+        "download_url": "https://github.com/google/go-containerregistry/releases/download/v0.21.5/go-containerregistry_Darwin_x86_64.tar.gz",
+        "version": "0.21.5",
+        "checksum": "d5ad8d97d7c5407f761b4fd37801044473f58b79a033f6a64e84ce6d010c1b2c",
+        "executable": true,
+        "destination": "helpers/crane",
+        "extract": {
+          "globs": [
+            "crane"
+          ],
+          "flatten": true,
+          "filetype": "tar.gz"
+        }
+      },
+      "darwin/arm64": {
+        "repo": "google/go-containerregistry",
+        "download_url": "https://github.com/google/go-containerregistry/releases/download/v0.21.5/go-containerregistry_Darwin_arm64.tar.gz",
+        "version": "0.21.5",
+        "checksum": "a41938cdbd8becc59e90f4bb491a557d52dce5681f9812c961854cab706f5f59",
+        "executable": true,
+        "destination": "helpers/crane",
+        "extract": {
+          "globs": [
+            "crane"
+          ],
+          "flatten": true,
+          "filetype": "tar.gz"
+        }
+      }
+    }
+  },
+  "config_checksum": "48502e3ee5029db8ca20a1d00135409ad2a50aa932a5af536f99742cf914b200"
+}
