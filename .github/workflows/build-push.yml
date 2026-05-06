@@ -104,28 +104,23 @@ jobs:
           username: ${{ inputs.registry_user }}
           password: ${{ secrets.registry_token }}
 
-      # Instructions for reproducibly building a container image are taken from:
-      # https://github.com/freedomofpress/repro-build?tab=readme-ov-file#build-and-push-a-container-image-on-github-actions
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-        with:
-          driver-opts: image=${{ needs.prepare.outputs.buildkit_image }}
-
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: freedomofpress/repro-build@b4c783c4458bbd0ee430f516e0ed3a60108e61da # 1.0.0
         with:
           context: ./src/
           file: Dockerfile
-          build-args: |
-            DEBIAN_ARCHIVE_DATE=${{ needs.prepare.outputs.debian_archive_date }}
-            SOURCE_DATE_EPOCH=${{ needs.prepare.outputs.source_date_epoch }}
+          platforms: ${{ matrix.platform.name }}
+          buildkit_image: ${{ needs.prepare.outputs.buildkit_image }}
+          source_date_epoch: ${{ needs.prepare.outputs.source_date_epoch }}
+          push: true
           provenance: false
-          outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image_name }}",push-by-digest=true,push=true,rewrite-timestamp=true,name-canonical=true
+          outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image_name }}",push-by-digest=true,push=true,name-canonical=true
+          build-args: DEBIAN_ARCHIVE_DATE=${{ needs.prepare.outputs.debian_archive_date }}
+          annotations: rocks.dangerzone.debian_archive_date=${{ needs.prepare.outputs.debian_archive_date }}
+          cache: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          annotations: |
-            rocks.dangerzone.debian_archive_date=${{ needs.prepare.outputs.debian_archive_date }}
 
       - name: Export digest
         run: |
@@ -174,11 +169,6 @@ jobs:
           registry: ghcr.io
           username: ${{ inputs.registry_user }}
           password: ${{ secrets.registry_token }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-        with:
-          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
@@ -256,24 +246,25 @@ jobs:
       matrix:
         platform:
           - runs-on: "ubuntu-24.04"
-            name: "amd64"
+            name: "linux/amd64"
           - runs-on: "ubuntu-24.04-arm"
-            name: "arm64"
+            name: "linux/arm64"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
-      - name: Reproduce the same container image
-        run: |
-          ./utils/reproduce-image.py \
-            --runtime \
-            docker \
-            --debian-archive-date \
-            ${{ needs.merge.outputs.debian_archive_date }} \
-            --platform \
-            linux/${{ matrix.platform.name }} \
-            ${{ needs.merge.outputs[format('digest_{0}', matrix.platform.name)] }}
+      - name: Reproduce and verify image
+        uses: freedomofpress/repro-build/verify@b4c783c4458bbd0ee430f516e0ed3a60108e61da # 1.0.0
+        with:
+          target_image: ${{ needs.merge.outputs.image }}@${{ needs.merge.outputs[format('digest_{0}', matrix.platform.name)] }}
+          file: Dockerfile
+          context: ./src/
+          platforms: ${{ matrix.platform.name }}
+          buildkit_image: ${{ needs.prepare.outputs.buildkit_image }}
+          runtime: docker
+          source_date_epoch: ${{ needs.prepare.outputs.source_date_epoch }}
+          build-args: DEBIAN_ARCHIVE_DATE=${{ needs.merge.outputs.debian_archive_date }}
 
   sign:
     if: ${{ inputs.sign }}
