@@ -305,6 +305,168 @@ def reproduce_image(*, platform, runtime, cache, date, digest, dry=False):
     analyze_tarball(tarball_path, digest, show_contents=True)
 
 
+def get_candidate_image(commit, image_name):
+    crane_binary = ensure_tool("crane")
+    short_commit = commit[:7]
+    click.echo(f"\n📦 Looking for images for commit: {short_commit}")
+    click.echo(f"   Repository: {image_name}\n")
+
+    result = run_cmd(
+        [crane_binary, "ls", "--full-ref", image_name],
+        capture_output=True,
+        check=True,
+    )
+
+    if not result or not result.stdout:
+        raise RuntimeError(
+            f"No images found in repository {image_name}. "
+            "Check that the repository name is correct and you have access to it."
+        )
+
+    images = [line for line in result.stdout.splitlines() if short_commit in line]
+
+    if not images:
+        raise RuntimeError(
+            f"No images found for commit {short_commit} in {image_name}. "
+            f"Available tags: {result.stdout.splitlines()[:10]}"
+            + ("..." if len(result.stdout.splitlines()) > 10 else "")
+        )
+
+    latest_image = images[-1]
+
+    result = run_cmd(
+        [crane_binary, "digest", latest_image],
+        capture_output=True,
+        check=True,
+    )
+    if not result or not result.stdout.strip():
+        raise RuntimeError(f"Failed to get digest for image {latest_image}")
+    digest = result.stdout.strip()
+
+    image_base = latest_image.split(":")[0]
+    full_image = f"{image_base}@{digest}"
+
+    click.echo("✅ Found image:")
+    click.echo(f"   {full_image}\n")
+    return full_image
+
+
+def get_platform_digests(full_image):
+    crane_binary = ensure_tool("crane")
+    click.echo(f"\n📋 Getting platform-specific digests for: {full_image}\n")
+
+    result = run_cmd(
+        [crane_binary, "manifest", full_image],
+        capture_output=True,
+        check=True,
+    )
+    try:
+        manifest = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"Failed to parse manifest JSON for {full_image}: {e}"
+        ) from e
+
+    manifests_list = manifest.get("manifests")
+    if not manifests_list:
+        raise RuntimeError(
+            f"Image {full_image} does not appear to be a multi-platform manifest index. "
+            "Expected 'manifests' key in the manifest JSON."
+        )
+
+    click.echo("✅ Platform digests retrieved:")
+    platforms = {}
+    for m in manifests_list:
+        try:
+            plat_key = f"{m['platform']['os']}/{m['platform']['architecture']}"
+            plat_digest = m["digest"]
+        except KeyError as e:
+            raise RuntimeError(
+                f"Invalid manifest entry in {full_image}: missing key {e}. Entry: {m}"
+            ) from e
+        platforms[plat_key] = plat_digest
+
+    for architecture, digest in platforms.items():
+        click.echo(f"- {architecture}: {digest}")
+
+    if len(platforms) != 2:
+        raise RuntimeError(
+            f"Unsupported number of platforms found: {len(platforms)} "
+            f"({', '.join(platforms.keys())}). Expected exactly 2 (linux/amd64 and linux/arm64)."
+        )
+
+    return platforms
+
+
+def run_reproduce_cmd_in_tmpdir(
+    root_manifest, platform_name, platform_image_digest, temp_dir, dry=False
+):
+    image_base = root_manifest.split("@")[0]
+    platform_image = f"{image_base}@{platform_image_digest}"
+
+    click.echo(f"\n🔄 Reproducing image for platform: {platform_name}")
+    click.echo(f"   Root manifest: {root_manifest}")
+    click.echo(f"   Platform image digest: {platform_image_digest}")
+    click.echo("   Debian archive date: (autodetect)")
+    click.echo(f"   Platform image: {platform_image}")
+    click.echo(f"   Repository path: {temp_dir}\n")
+
+    run_cmd(
+        [
+            sys.executable,
+            "-m",
+            "scripts.image",
+            "reproduce",
+            "--debian-archive-date",
+            "autodetect",
+            "--platform",
+            platform_name,
+            platform_image,
+        ],
+        cwd=temp_dir,
+        check=True,
+        dry=dry,
+    )
+    click.echo(f"\n✅ Image reproduction successful for {platform_name}\n")
+
+
+def sign_image(image, ghcr_signer_path):
+    click.echo(f"\n✍️  Signing image: {image}")
+    click.echo(f"   Using ghcr-signer at: {ghcr_signer_path}\n")
+
+    ghcr_signer_script = Path(ghcr_signer_path) / "ghcr-signer.py"
+
+    if not ghcr_signer_script.exists():
+        raise RuntimeError(f"ghcr-signer.py not found at {ghcr_signer_script}")
+
+    run_cmd(
+        [
+            sys.executable,
+            str(ghcr_signer_script),
+            "prepare",
+            "--sk",
+            image,
+        ],
+        check=True,
+    )
+
+    click.echo("\n✅ Image signed successfully")
+    click.echo("⚠️  Remember to:")
+    click.echo("   1. Create a PR with the signatures")
+    click.echo("   2. Wait for CI to pass")
+    click.echo("   3. Merge the PR\n")
+
+
+def validate_commit_callback(ctx, param, value):
+    if value is None:
+        return value
+    if not re.match(r"^[0-9a-f]{40}$", value.lower()):
+        raise click.BadParameter(
+            f"Invalid commit hash format: {value}. Must be a complete SHA1 commit."
+        )
+    return value
+
+
 def build_image(
     *,
     platform=None,
@@ -492,6 +654,136 @@ def reproduce(platform, runtime, no_cache, debian_archive_date, dry, digest):
         digest=digest,
         dry=dry,
     )
+
+
+@cli.command()
+@click.option(
+    "--commit",
+    default=None,
+    callback=validate_commit_callback,
+    help="The full SHA1 commit to use",
+)
+@click.option(
+    "--ghcr-signer-path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the ghcr-signer repository",
+)
+@click.option(
+    "--repository",
+    default="freedomofpress/dangerzone-image",
+    help="The repository to use",
+)
+@click.option(
+    "--workflow",
+    default=".github/workflows/release.yml",
+    help="The workflow to use",
+)
+@click.option(
+    "--image-name",
+    default=IMAGE_NAME,
+    help="The image name to use",
+)
+@click.option(
+    "--skip-reproduction-for",
+    multiple=True,
+    default=[],
+    help="Digests to avoid reproducing",
+)
+@click.option(
+    "--skip-signing",
+    is_flag=True,
+    default=False,
+    help="Skip the generation of the signatures",
+)
+@click.option(
+    "--dry",
+    is_flag=True,
+    default=False,
+    help="Do not run any commands, just print what would happen",
+)
+def release(
+    commit,
+    ghcr_signer_path,
+    repository,
+    workflow,
+    image_name,
+    skip_reproduction_for,
+    skip_signing,
+    dry,
+):
+    """Attest, reproduce, and release a container image."""
+    logger.info("Starting release process for commit %s", commit or "(HEAD)")
+    for tool in ["crane", "cosign"]:
+        ensure_tool(tool)
+
+    if not shutil.which("git"):
+        raise RuntimeError("'git' is required but not found in PATH")
+
+    commit_provided = commit is not None
+    commit = commit or get_git_head()
+    should_cache = commit_provided or not _is_dirty()
+
+    root_manifest = get_candidate_image(commit, image_name)
+
+    click.echo(f"\n🔐 Attesting provenance for image: {root_manifest}")
+    verify_attestation(root_manifest, repository, workflow)
+    click.echo("\n✅ Provenance attestation successful\n")
+
+    digests = get_platform_digests(root_manifest)
+
+    temp_dir = tempfile.mkdtemp(prefix="dangerzone-reproduce-")
+    click.echo(f"\n📁 Created temporary directory: {temp_dir}")
+
+    try:
+        click.echo("📥 Cloning Dangerzone repository...")
+        run_cmd(
+            [
+                "git",
+                "clone",
+                f"https://github.com/{repository}.git",
+                temp_dir,
+            ],
+            check=True,
+        )
+        click.echo("✅ Repository cloned")
+
+        click.echo(f"🔀 Checking out commit {commit}...")
+        run_cmd(["git", "-C", temp_dir, "checkout", commit], check=True)
+
+        for plat in ["linux/amd64", "linux/arm64"]:
+            platform_digest = digests[plat]
+            if _should_skip_reproduction(
+                plat,
+                platform_digest,
+                skip_reproduction_for,
+                commit,
+                repository,
+                image_name,
+                should_cache,
+            ):
+                continue
+            run_reproduce_cmd_in_tmpdir(
+                root_manifest,
+                plat,
+                platform_digest,
+                temp_dir,
+                dry=dry,
+            )
+            if (
+                should_cache
+                and not dry
+                and platform_digest not in skip_reproduction_for
+            ):
+                _write_reproduce_cache(platform_digest, commit, repository, image_name)
+    finally:
+        click.echo(f"\n🧹 Cleaning up temporary directory: {temp_dir}")
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+    if skip_signing:
+        click.echo("⏩ Skipping signing")
+    else:
+        sign_image(root_manifest, ghcr_signer_path)
 
 
 if __name__ == "__main__":
