@@ -51,7 +51,7 @@ jobs:
         id: cache-container-image
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          key: v5-${{ steps.date.outputs.date }}-${{ hashFiles('Dockerfile', 'conversion/*.py', 'container_helpers/*', 'build-image.py') }}
+          key: v5-${{ steps.date.outputs.date }}-${{ hashFiles('Dockerfile', 'conversion/*.py', 'container_helpers/*', 'src/scripts/image.py') }}
           path: |
             container.tar
             image-id.txt
@@ -59,7 +59,7 @@ jobs:
       - name: Build Dangerzone image
         if: ${{ steps.cache-container-image.outputs.cache-hit != 'true' }}
         run: |
-          python3 build-image.py -d ${{ steps.date.outputs.date }}
+          uv run image build -d ${{ steps.date.outputs.date }}
 
       - name: Load local image for tests
         run: |
