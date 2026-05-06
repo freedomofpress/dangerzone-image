@@ -82,22 +82,41 @@ uv run pytest --local
 uv run --with pytest-xdist pytest -n 6
 ```
 
-## Building and Reproducing the Image
+## Building and reproducing the image
 
-To build the Dangerzone container image, use the `build-image.py` script:
+To build, verify, reproduce, or release the Dangerzone container image, use the unified `image` tool. Before your first run, make sure to install the necessary dependencies (`crane` / `cosign`) with [Mazette](https://github.com/freedomofpress/mazette):
 
 ```bash
-python3 build-image.py [OPTIONS]
+uvx mazette install
 ```
 
-**Common Options:**
-*   `--platform <PLATFORM>`: Specify the build platform (e.g., `linux/amd64`, `linux/arm64`). Defaults to the current platform.
-*   `--runtime <RUNTIME>`: Specify the container runtime (`docker` or `podman`). Defaults to `podman`.
-*   `--debian-archive-date <YYYYMMDD>`: Use a specific Debian snapshot archive date for reproducibility.
+Then, run it with
 
-**Example:**
 ```bash
-python3 build-image.py --platform linux/amd64 --debian-archive-date 20231026
+uv run image <subcommand> [OPTIONS]
 ```
 
-To verify the reproducibility of a Dangerzone container image, follow [these instructions](docs/reproducibility.md).
+The available subcommands are:
+
+- **`build`** - Build a reproducible container image
+- **`verify-attestation`** - Verify SLSA provenance attestation for an image
+- **`reproduce`** - Reproduce a container image and verify its digest
+- **`release`** - Attest, reproduce, and release a container image
+
+Here are some examples:
+
+```bash
+# Build a container image
+uv run image build --platform linux/amd64 --debian-archive-date 20260505
+
+# Verify an image's attestation
+uv run image verify-attestation --image "ghcr.io/freedomofpress/dangerzone/v1@sha256:..."
+
+# Reproduce an image and verify its digest
+uv run image reproduce --debian-archive-date 20231026 <digest>
+# ... or if you don't know the exact date
+uv run image reproduce --debian-archive-date autodetect ghcr.io/freedomofpress/dangerzone/v1@sha256:<digest>
+
+# Attest, reproduce, and release a container image
+uv run image release --ghcr-signer-path /path/to/ghcr-signer
+```
