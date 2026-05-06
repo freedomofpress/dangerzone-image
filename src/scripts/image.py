@@ -10,7 +10,6 @@ Subcommands:
     release            Attest, reproduce, and release a container image
 """
 
-import argparse
 import json
 import logging
 import os
@@ -24,6 +23,7 @@ import tempfile
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+import click
 from repro_build import Builder, analyze_tarball
 
 logger = logging.getLogger(__name__)
@@ -122,16 +122,6 @@ def determine_debian_archive_date():
     )
 
 
-def validate_commit_format(value):
-    if value is None:
-        return value
-    if not re.match(r"^[0-9a-f]{40}$", value.lower()):
-        raise argparse.ArgumentTypeError(
-            f"Invalid commit hash format: {value}. Must be a complete SHA1 commit."
-        )
-    return value
-
-
 def get_git_head():
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -169,37 +159,6 @@ def build_image(
     builder.build()
 
 
-def cmd_build(args):
-    if not args.debian_archive_date:
-        args.debian_archive_date = determine_debian_archive_date()
-
-    tag = args.tag or f"{args.debian_archive_date}-{determine_git_tag()}"
-    image_name_tagged = f"{IMAGE_NAME}:{tag}"
-
-    print(f"Will tag the container image as '{image_name_tagged}'")
-
-    image_id_path = PROJECT_ROOT / "image-id.txt"
-    if not args.dry:
-        with open(image_id_path, "w") as f:
-            f.write(image_name_tagged)
-
-    date_annotation = ANNOTATION_DATE.format(date=args.debian_archive_date)
-    print("Will annotate the image with the following:")
-    print(f"- {date_annotation}")
-
-    print("Building container image")
-
-    build_image(
-        platform=args.platform,
-        runtime=args.runtime,
-        cache=args.use_cache,
-        date=args.debian_archive_date,
-        dry=args.dry,
-        tag=image_name_tagged,
-        output=args.output,
-    )
-
-
 def verify_attestation(image_name, repository, workflow):
     cosign_binary = ensure_tool("cosign")
 
@@ -233,29 +192,19 @@ def verify_attestation(image_name, repository, workflow):
     return True
 
 
-def cmd_verify_attestation(args):
-    ensure_tool("cosign")
-    verify_attestation(args.image, args.repository, args.workflow)
-    print("Provenance attestation verified successfully")
-
-
 def get_debian_archive_date(digest):
     if "@sha256:" not in digest:
         raise RuntimeError(
             "Must pass full image name along with the digest to make autodetection work"
         )
     crane_binary = ensure_tool("crane")
-    resp = (
-        subprocess.run(
-            [crane_binary, "manifest", digest],
-            capture_output=True,
-            check=True,
-        )
-        .stdout.decode()
-        .strip()
+    result = run_cmd(
+        [crane_binary, "manifest", digest],
+        capture_output=True,
+        check=True,
     )
     try:
-        manifest = json.loads(resp)
+        manifest = json.loads(result.stdout)
     except json.JSONDecodeError as e:
         raise RuntimeError(f"Failed to parse manifest JSON for {digest}: {e}") from e
 
@@ -279,31 +228,11 @@ def get_debian_archive_date(digest):
     return date
 
 
-def cmd_reproduce(args):
-    ensure_tool("crane")
-    date = args.debian_archive_date
-
-    if args.debian_archive_date == "autodetect":
-        logger.info("Autodetecting Debian archive date for image %s", args.digest)
-        date = get_debian_archive_date(args.digest)
-        logger.info("Successfully retrieved Debian archive date: %s", date)
-
-    logger.info("Building container image")
-    reproduce_image(
-        platform=args.platform,
-        runtime=args.runtime,
-        cache=not args.no_cache,
-        date=date,
-        digest=args.digest,
-        dry=args.dry,
-    )
-
-
 def get_candidate_image(commit, image_name):
     crane_binary = ensure_tool("crane")
     short_commit = commit[:7]
-    print(f"\nLooking for images for commit: {short_commit}")
-    print(f"   Repository: {image_name}\n")
+    click.echo(f"\n📦 Looking for images for commit: {short_commit}")
+    click.echo(f"   Repository: {image_name}\n")
 
     result = run_cmd(
         [crane_binary, "ls", "--full-ref", image_name],
@@ -340,14 +269,14 @@ def get_candidate_image(commit, image_name):
     image_base = latest_image.split(":")[0]
     full_image = f"{image_base}@{digest}"
 
-    print("Found image:")
-    print(f"   {full_image}\n")
+    click.echo("✅ Found image:")
+    click.echo(f"   {full_image}\n")
     return full_image
 
 
 def get_platform_digests(full_image):
     crane_binary = ensure_tool("crane")
-    print(f"\nGetting platform-specific digests for: {full_image}\n")
+    click.echo(f"\n📋 Getting platform-specific digests for: {full_image}\n")
 
     result = run_cmd(
         [crane_binary, "manifest", full_image],
@@ -368,7 +297,7 @@ def get_platform_digests(full_image):
             "Expected 'manifests' key in the manifest JSON."
         )
 
-    print("Platform digests retrieved:")
+    click.echo("✅ Platform digests retrieved:")
     platforms = {}
     for m in manifests_list:
         try:
@@ -381,7 +310,7 @@ def get_platform_digests(full_image):
         platforms[plat_key] = plat_digest
 
     for architecture, digest in platforms.items():
-        print(f"- {architecture}: {digest}")
+        click.echo(f"- {architecture}: {digest}")
 
     if len(platforms) != 2:
         raise RuntimeError(
@@ -398,11 +327,12 @@ def run_reproduce_cmd_in_tmpdir(
     image_base = root_manifest.split("@")[0]
     platform_image = f"{image_base}@{platform_image_digest}"
 
-    print(f"\nReproducing image for platform: {platform_name}")
-    print(f"   Root manifest: {root_manifest}")
-    print(f"   Platform image digest: {platform_image_digest}")
-    print(f"   Platform image: {platform_image}")
-    print(f"   Repository path: {temp_dir}\n")
+    click.echo(f"\n🔄 Reproducing image for platform: {platform_name}")
+    click.echo(f"   Root manifest: {root_manifest}")
+    click.echo(f"   Platform image digest: {platform_image_digest}")
+    click.echo("   Debian archive date: (autodetect)")
+    click.echo(f"   Platform image: {platform_image}")
+    click.echo(f"   Repository path: {temp_dir}\n")
 
     run_cmd(
         [
@@ -420,7 +350,7 @@ def run_reproduce_cmd_in_tmpdir(
         check=True,
         dry=dry,
     )
-    print(f"\nImage reproduction successful for {platform_name}\n")
+    click.echo(f"\n✅ Image reproduction successful for {platform_name}\n")
 
 
 def reproduce_image(*, platform, runtime, cache, date, digest, dry=False):
@@ -431,13 +361,16 @@ def reproduce_image(*, platform, runtime, cache, date, digest, dry=False):
         date=date,
         dry=dry,
     )
+    if dry:
+        logger.info("Would analyze the tarball against digest: %s", digest)
+        return
     tarball_path = PROJECT_ROOT / "container.tar"
     analyze_tarball(tarball_path, digest, show_contents=True)
 
 
 def sign_image(image, ghcr_signer_path):
-    print(f"\nSigning image: {image}")
-    print(f"   Using ghcr-signer at: {ghcr_signer_path}\n")
+    click.echo(f"\n✍️  Signing image: {image}")
+    click.echo(f"   Using ghcr-signer at: {ghcr_signer_path}\n")
 
     ghcr_signer_script = Path(ghcr_signer_path) / "ghcr-signer.py"
 
@@ -455,54 +388,277 @@ def sign_image(image, ghcr_signer_path):
         check=True,
     )
 
-    print("\nImage signed successfully")
-    print("Remember to:")
-    print("   1. Create a PR with the signatures")
-    print("   2. Wait for CI to pass")
-    print("   3. Merge the PR\n")
+    click.echo("\n✅ Image signed successfully")
+    click.echo("⚠️  Remember to:")
+    click.echo("   1. Create a PR with the signatures")
+    click.echo("   2. Wait for CI to pass")
+    click.echo("   3. Merge the PR\n")
 
 
-def cmd_release(args):
+def validate_commit_callback(ctx, param, value):
+    if value is None:
+        return value
+    if not re.match(r"^[0-9a-f]{40}$", value.lower()):
+        raise click.BadParameter(
+            f"Invalid commit hash format: {value}. Must be a complete SHA1 commit."
+        )
+    return value
+
+
+@click.group(context_settings={"show_default": True})
+def cli():
+    """Unified tool for building, verifying, reproducing, and releasing Dangerzone container images."""
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+
+@cli.command()
+@click.option(
+    "--runtime",
+    type=click.Choice(["docker", "podman"]),
+    default=CONTAINER_RUNTIME,
+    help="The container runtime for building the image",
+)
+@click.option(
+    "--platform",
+    default=None,
+    help="The platform for building the image",
+)
+@click.option(
+    "--output",
+    "-o",
+    default=str(Path("container.tar")),
+    help="Path to store the container image",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    default=False,
+    help="Do not use existing cached images for the container build",
+)
+@click.option(
+    "--tag",
+    default=None,
+    help="Provide a custom tag for the image (for development only)",
+)
+@click.option(
+    "--debian-archive-date",
+    "-d",
+    default=None,
+    help="Use a specific Debian snapshot archive, by its date",
+)
+@click.option(
+    "--dry",
+    is_flag=True,
+    default=False,
+    help="Do not run any commands, just print what would happen",
+)
+def build(runtime, platform, output, no_cache, tag, debian_archive_date, dry):
+    """Build a reproducible container image."""
+    if not debian_archive_date:
+        debian_archive_date = determine_debian_archive_date()
+
+    tag = tag or f"{debian_archive_date}-{determine_git_tag()}"
+    image_name_tagged = f"{IMAGE_NAME}:{tag}"
+
+    click.echo(f"Will tag the container image as '{image_name_tagged}'")
+
+    image_id_path = PROJECT_ROOT / "image-id.txt"
+    if not dry:
+        with open(image_id_path, "w") as fh:
+            fh.write(image_name_tagged)
+
+    date_annotation = ANNOTATION_DATE.format(date=debian_archive_date)
+    click.echo("Will annotate the image with the following:")
+    click.echo(f"- {date_annotation}")
+
+    click.echo("Building container image")
+
+    build_image(
+        platform=platform,
+        runtime=runtime,
+        cache=not no_cache,
+        date=debian_archive_date,
+        dry=dry,
+        tag=image_name_tagged,
+        output=output,
+    )
+
+
+@cli.command("verify-attestation")
+@click.option(
+    "--image",
+    required=True,
+    help="Full image reference (e.g., ghcr.io/foo/bar@sha256:...)",
+)
+@click.option(
+    "--repository",
+    default="freedomofpress/dangerzone-image",
+    help="The repository to use",
+)
+@click.option(
+    "--workflow",
+    default=".github/workflows/release.yml",
+    help="The workflow to use",
+)
+def verify_attestation_cmd(image, repository, workflow):
+    """Verify SLSA provenance attestation for an image."""
+    ensure_tool("cosign")
+    verify_attestation(image, repository, workflow)
+    click.echo("✅ Provenance attestation verified successfully")
+
+
+@cli.command()
+@click.option(
+    "--platform",
+    default=None,
+    help="The platform for building the image",
+)
+@click.option(
+    "--runtime",
+    type=click.Choice(["docker", "podman"]),
+    default=CONTAINER_RUNTIME,
+    help="The container runtime for building the image",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    default=False,
+    help="Do not use existing cached images for the container build",
+)
+@click.option(
+    "--debian-archive-date",
+    default=None,
+    help="Use a specific Debian snapshot archive, by its date, or 'autodetect'",
+)
+@click.option(
+    "--dry",
+    is_flag=True,
+    default=False,
+    help="Do not run any commands, just print what would happen",
+)
+@click.argument("digest")
+def reproduce(platform, runtime, no_cache, debian_archive_date, dry, digest):
+    """Reproduce a container image and verify its digest."""
+    ensure_tool("crane")
+    date = debian_archive_date
+
+    if debian_archive_date == "autodetect":
+        logger.info("Autodetecting Debian archive date for image %s", digest)
+        date = get_debian_archive_date(digest)
+        logger.info("Successfully retrieved Debian archive date: %s", date)
+
+    logger.info("Building container image")
+    reproduce_image(
+        platform=platform,
+        runtime=runtime,
+        cache=not no_cache,
+        date=date,
+        digest=digest,
+        dry=dry,
+    )
+
+
+@cli.command()
+@click.option(
+    "--commit",
+    default=None,
+    callback=validate_commit_callback,
+    help="The full SHA1 commit to use",
+)
+@click.option(
+    "--ghcr-signer-path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the ghcr-signer repository",
+)
+@click.option(
+    "--repository",
+    default="freedomofpress/dangerzone-image",
+    help="The repository to use",
+)
+@click.option(
+    "--workflow",
+    default=".github/workflows/release.yml",
+    help="The workflow to use",
+)
+@click.option(
+    "--image-name",
+    default=IMAGE_NAME,
+    help="The image name to use",
+)
+@click.option(
+    "--skip-reproduction-for",
+    multiple=True,
+    default=[],
+    help="Digests to avoid reproducing",
+)
+@click.option(
+    "--skip-signing",
+    is_flag=True,
+    default=False,
+    help="Skip the generation of the signatures",
+)
+@click.option(
+    "--dry",
+    is_flag=True,
+    default=False,
+    help="Do not run any commands, just print what would happen",
+)
+def release(
+    commit,
+    ghcr_signer_path,
+    repository,
+    workflow,
+    image_name,
+    skip_reproduction_for,
+    skip_signing,
+    dry,
+):
+    """Attest, reproduce, and release a container image."""
     for tool in ["crane", "cosign"]:
         ensure_tool(tool)
 
     if not shutil.which("git"):
         raise RuntimeError("'git' is required but not found in PATH")
 
-    commit = args.commit or get_git_head()
+    commit = commit or get_git_head()
 
-    root_manifest = get_candidate_image(commit, args.image_name)
+    root_manifest = get_candidate_image(commit, image_name)
 
-    print(f"\nAttesting provenance for image: {root_manifest}")
-    verify_attestation(root_manifest, args.repository, args.workflow)
-    print("\nProvenance attestation successful\n")
+    click.echo(f"\n🔐 Attesting provenance for image: {root_manifest}")
+    verify_attestation(root_manifest, repository, workflow)
+    click.echo("\n✅ Provenance attestation successful\n")
 
     digests = get_platform_digests(root_manifest)
 
     temp_dir = tempfile.mkdtemp(prefix="dangerzone-reproduce-")
-    print(f"\nCreated temporary directory: {temp_dir}")
+    click.echo(f"\n📁 Created temporary directory: {temp_dir}")
 
     try:
-        print("Cloning Dangerzone repository...")
+        click.echo("📥 Cloning Dangerzone repository...")
         run_cmd(
             [
                 "git",
                 "clone",
-                f"https://github.com/{args.repository}.git",
+                f"https://github.com/{repository}.git",
                 temp_dir,
             ],
             check=True,
         )
-        print("Repository cloned")
+        click.echo("✅ Repository cloned")
 
-        print(f"Checking out commit {commit}...")
+        click.echo(f"🔀 Checking out commit {commit}...")
         run_cmd(["git", "-C", temp_dir, "checkout", commit], check=True)
 
         for plat in ["linux/amd64", "linux/arm64"]:
             platform_digest = digests[plat]
-            if platform_digest in args.skip_reproduction_for:
-                print(
-                    f"Skipping reproduction for platform {plat} (digest {platform_digest})"
+            if platform_digest in skip_reproduction_for:
+                click.echo(
+                    f"⏩ Skipping reproduction for platform {plat} (digest {platform_digest})"
                 )
             else:
                 run_reproduce_cmd_in_tmpdir(
@@ -510,224 +666,17 @@ def cmd_release(args):
                     plat,
                     platform_digest,
                     temp_dir,
-                    dry=args.dry,
+                    dry=dry,
                 )
     finally:
-        print(f"\nCleaning up temporary directory: {temp_dir}")
+        click.echo(f"\n🧹 Cleaning up temporary directory: {temp_dir}")
         shutil.rmtree(temp_dir, ignore_errors=True)
 
-    if args.skip_signing:
-        print("Skipping signing")
+    if skip_signing:
+        click.echo("⏩ Skipping signing")
     else:
-        sign_image(root_manifest, args.ghcr_signer_path)
-
-
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
-
-
-def add_build_args(parser):
-    parser.add_argument(
-        "--runtime",
-        choices=["docker", "podman"],
-        default=CONTAINER_RUNTIME,
-        help="The container runtime for building the image",
-    )
-    parser.add_argument(
-        "--platform",
-        default=None,
-        help="The platform for building the image",
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        default=str(Path("container.tar")),
-        help="Path to store the container image",
-    )
-    parser.add_argument(
-        "--use-cache",
-        type=str2bool,
-        nargs="?",
-        default=True,
-        const=True,
-        help="Use the builder's cache to speed up the builds",
-    )
-    parser.add_argument(
-        "--tag",
-        default=None,
-        help="Provide a custom tag for the image (for development only)",
-    )
-    parser.add_argument(
-        "--debian-archive-date",
-        "-d",
-        default=None,
-        help="Use a specific Debian snapshot archive, by its date",
-    )
-    parser.add_argument(
-        "--dry",
-        default=False,
-        action="store_true",
-        help="Do not run any commands, just print what would happen",
-    )
-
-
-def create_parser():
-    parser = argparse.ArgumentParser(
-        prog="image",
-        description="Unified tool for building, verifying, reproducing, and releasing Dangerzone container images",
-    )
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-
-    build_parser = subparsers.add_parser(
-        "build",
-        help="Build a reproducible container image",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    build_parser.set_defaults(func=cmd_build)
-    add_build_args(build_parser)
-
-    verify_parser = subparsers.add_parser(
-        "verify-attestation",
-        help="Verify SLSA provenance attestation for an image",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    verify_parser.set_defaults(func=cmd_verify_attestation)
-    verify_parser.add_argument(
-        "--image",
-        required=True,
-        help="Full image reference (e.g., ghcr.io/foo/bar@sha256:...)",
-    )
-    verify_parser.add_argument(
-        "--repository",
-        default="freedomofpress/dangerzone-image",
-        help="The repository to use",
-    )
-    verify_parser.add_argument(
-        "--workflow",
-        default=".github/workflows/release.yml",
-        help="The workflow to use",
-    )
-
-    reproduce_parser = subparsers.add_parser(
-        "reproduce",
-        help="Reproduce a container image and verify its digest",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    reproduce_parser.set_defaults(func=cmd_reproduce)
-    reproduce_parser.add_argument(
-        "--platform",
-        default=None,
-        help="The platform for building the image",
-    )
-    reproduce_parser.add_argument(
-        "--runtime",
-        choices=["docker", "podman"],
-        default=CONTAINER_RUNTIME,
-        help="The container runtime for building the image",
-    )
-    reproduce_parser.add_argument(
-        "--no-cache",
-        default=False,
-        action="store_true",
-        help="Do not use existing cached images for the container build",
-    )
-    reproduce_parser.add_argument(
-        "--debian-archive-date",
-        default=None,
-        help="Use a specific Debian snapshot archive, by its date, or 'autodetect'",
-    )
-    reproduce_parser.add_argument(
-        "--dry",
-        default=False,
-        action="store_true",
-        help="Do not run any commands, just print what would happen",
-    )
-    reproduce_parser.add_argument(
-        "digest",
-        help="The digest of the image that you want to reproduce",
-    )
-
-    release_parser = subparsers.add_parser(
-        "release",
-        help="Attest, reproduce, and release a container image",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    release_parser.set_defaults(func=cmd_release)
-    release_parser.add_argument(
-        "--commit",
-        default=None,
-        type=validate_commit_format,
-        help="The full SHA1 commit to use",
-    )
-    release_parser.add_argument(
-        "--ghcr-signer-path",
-        required=True,
-        help="Path to the ghcr-signer repository",
-    )
-    release_parser.add_argument(
-        "--repository",
-        default="freedomofpress/dangerzone-image",
-        help="The repository to use",
-    )
-    release_parser.add_argument(
-        "--workflow",
-        default=".github/workflows/release.yml",
-        help="The workflow to use",
-    )
-    release_parser.add_argument(
-        "--image-name",
-        default=IMAGE_NAME,
-        help="The image name to use",
-    )
-    release_parser.add_argument(
-        "--skip-reproduction-for",
-        help="Digests to avoid reproducing",
-        nargs="*",
-        default=[],
-    )
-    release_parser.add_argument(
-        "--skip-signing",
-        help="Skip the generation of the signatures",
-        action="store_true",
-    )
-    release_parser.add_argument(
-        "--dry",
-        default=False,
-        action="store_true",
-        help="Do not run any commands, just print what would happen",
-    )
-
-    return parser
-
-
-def main():
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    parser = create_parser()
-    args = parser.parse_args()
-
-    if args.command is None:
-        parser.print_help()
-        return 1
-
-    try:
-        args.func(args)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-
-    return 0
+        sign_image(root_manifest, ghcr_signer_path)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    cli()

@@ -29,7 +29,7 @@ requires = ["uv_build>=0.10.7,<0.11.0"]
 build-backend = "uv_build"
 
 [project.scripts]
-image = "scripts.image:main"
+image = "scripts.image:cli"
 
 [tool.ruff]
 target-version = "py310"
