@@ -202,3 +202,12 @@ ignore:
   #
   # [1]: https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0009
   - vulnerability: CVE-2026-5450
+
+  # CVE-2026-33845
+  # ==============
+  #
+  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-33845
+  #
+  # Verdict: Dangerzone is not affected because it doesn't make any network
+  # connections, and therefore DTLS is not used.
+  - vulnerability: CVE-2026-33845
