@@ -106,7 +106,7 @@ jobs:
 
       - name: Build and push by digest
         id: build
-        uses: freedomofpress/repro-build@1.0.0
+        uses: freedomofpress/repro-build@b4c783c4458bbd0ee430f516e0ed3a60108e61da # 1.0.0
         with:
           context: ./src/
           file: Dockerfile
@@ -260,7 +260,7 @@ jobs:
           fetch-depth: 0
 
       - name: Reproduce and verify image
-        uses: freedomofpress/repro-build/verify@1.0.0
+        uses: freedomofpress/repro-build/verify@b4c783c4458bbd0ee430f516e0ed3a60108e61da # 1.0.0
         with:
           target_image: ${{ needs.merge.outputs.image }}@${{ needs.merge.outputs[format('digest_{0}', matrix.platform.name)] }}
           file: Dockerfile
