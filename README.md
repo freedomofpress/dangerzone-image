@@ -84,20 +84,111 @@ uv run --with pytest-xdist pytest -n 6
 
 ## Building and Reproducing the Image
 
-To build the Dangerzone container image, use the `build-image.py` script:
+To build, verify, reproduce, or release the Dangerzone container image, use the unified `image` tool:
 
 ```bash
-python3 build-image.py [OPTIONS]
+uv run image <subcommand> [OPTIONS]
 ```
 
-**Common Options:**
+### Subcommands
+
+#### `build`
+
+Build a reproducible container image:
+
+```bash
+uv run image build [OPTIONS]
+```
+
+**Options:**
 *   `--platform <PLATFORM>`: Specify the build platform (e.g., `linux/amd64`, `linux/arm64`). Defaults to the current platform.
 *   `--runtime <RUNTIME>`: Specify the container runtime (`docker` or `podman`). Defaults to `podman`.
-*   `--debian-archive-date <YYYYMMDD>`: Use a specific Debian snapshot archive date for reproducibility.
+*   `--debian-archive-date <YYYYMMDD>`, `-d`: Use a specific Debian snapshot archive date for reproducibility.
+*   `--tag <TAG>`: Provide a custom tag for the image (for development only).
+*   `--output <PATH>`, `-o`: Path to store the container image (default: `container.tar`).
+*   `--use-cache [yes|no]`: Use the builder's cache to speed up builds (default: yes).
+*   `--dry`: Print commands without executing them.
 
 **Example:**
 ```bash
-python3 build-image.py --platform linux/amd64 --debian-archive-date 20231026
+uv run image build --platform linux/amd64 --debian-archive-date 20231026
 ```
 
-To verify the reproducibility of a Dangerzone container image, follow [these instructions](docs/reproducibility.md).
+#### `verify-attestation`
+
+Verify the SLSA provenance attestation for a container image:
+
+```bash
+uv run image verify-attestation --image <FULL_IMAGE_REF> [OPTIONS]
+```
+
+**Options:**
+*   `--image <REF>`: Full image reference (e.g., `ghcr.io/foo/bar@sha256:...`). **Required.**
+*   `--repository <REPO>`: GitHub repository to verify against (default: `freedomofpress/dangerzone-image`).
+*   `--workflow <PATH>`: GitHub Actions workflow path (default: `.github/workflows/release.yml`).
+
+**Example:**
+```bash
+uv run image verify-attestation --image "ghcr.io/freedomofpress/dangerzone/v1@sha256:..."
+```
+
+#### `reproduce`
+
+Reproduce a container image and verify its digest:
+
+```bash
+uv run image reproduce [OPTIONS] <DIGEST>
+```
+
+**Options:**
+*   `--platform <PLATFORM>`: Specify the build platform. Defaults to the current platform.
+*   `--runtime <RUNTIME>`: Specify the container runtime (`docker` or `podman`). Defaults to `podman`.
+*   `--no-cache`: Do not use existing cached images for the container build.
+*   `--debian-archive-date <DATE>`: Use a specific Debian snapshot archive date, or `autodetect` to retrieve it from the image annotation.
+*   `--dry`: Print commands without executing them.
+
+**Examples:**
+```bash
+# With explicit date
+uv run image reproduce --debian-archive-date 20231026 <digest>
+
+# Autodetect date from image annotation (requires full image name with digest)
+uv run image reproduce --debian-archive-date autodetect ghcr.io/freedomofpress/dangerzone/v1@sha256:<digest>
+```
+
+#### `release`
+
+Attest provenance, reproduce, and release a container image:
+
+```bash
+uv run image release --ghcr-signer-path <PATH> [OPTIONS]
+```
+
+**Options:**
+*   `--ghcr-signer-path <PATH>`: Path to the ghcr-signer repository. **Required.**
+*   `--commit <SHA>`: Full SHA1 commit to use. Defaults to the git HEAD of the current branch.
+*   `--repository <REPO>`: GitHub repository to use (default: `freedomofpress/dangerzone-image`).
+*   `--workflow <PATH>`: GitHub Actions workflow path.
+*   `--image-name <NAME>`: Container image name (default: `ghcr.io/freedomofpress/dangerzone/v1`).
+*   `--skip-reproduction-for [<DIGEST> ...]`: Digests to skip during reproduction.
+*   `--skip-signing`: Skip generating signatures.
+*   `--dry`: Print commands without executing them.
+
+### Dependencies
+
+The following tools are required for various subcommands:
+
+| Tool | Required by | Notes |
+| ---- | ----------- | ----- |
+| `podman` or `docker` | `build`, `reproduce` | Container runtime for building images |
+| `crane` | `reproduce` (autodetect), `release` | Installed via `uvx mazette install crane` |
+| `cosign` | `verify-attestation`, `release` | Installed via `uvx mazette install cosign` |
+| `git` | `build`, `release` | For determining git tags and cloning repos |
+
+The `repro-build` Python library is included as a project dependency and installed automatically via `uv sync`.
+
+Install `crane` and `cosign` with:
+
+```bash
+uvx mazette install
+```

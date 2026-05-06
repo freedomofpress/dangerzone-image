@@ -9,17 +9,18 @@ Releasing this image for public usage is done via these steps:
 2. Reproduce it **bit-for-bit** locally.
 3. Sign it with the Dangerzone signing key and mark it as `latest` in ghcr.io.
 
-These steps can be run with the following script:
+These steps can be run with the following command:
 
 ```bash
-poetry run ./dev_scripts/release-container-image.py
+uv run image release
 ```
 
 ## Pick a release candidate image
 
 Here is how to pick a container image built from the `main` branch:
 
-- [ ] Clone Dangerzone locally and pull the latest changes in the `main` branch.
+- [ ] Clone `freedomofpress/dangerzone-image` locally and pull the latest
+  changes in the `main` branch.
 - [ ] Grab the latest container image for this commit and get its digest:
 
   ```
@@ -45,15 +46,15 @@ Here is how to pick a container image built from the `main` branch:
 
 Here is how to attest the provenance info and reproducibility of the image:
 
-- [ ] Attest provenance with `poetry run ./dev_scripts/dangerzone-image attest-provenance $IMAGE`
+- [ ] Provenance is verified automatically by `uv run image verify-attestation` using `cosign verify-attestation`
 - [ ] Grab digests of platform-specific images (`linux/amd64` and `linux/arm64`) with `crane manifest $IMAGE`
 - [ ] Reproduce it bit-for-bit locally for every platform:
 
   ```
   for platform in linux/amd64 linux/arm64; do
-    poetry run ./dev_scripts/reproduce-image.py \
+    uv run image reproduce \
         --debian-archive-date <DATE> \
-        --platform $platform
+        --platform $platform \
         ${IMAGE%@*}@sha256:<platform-digest>
   done
   ```
@@ -61,7 +62,7 @@ Here is how to attest the provenance info and reproducibility of the image:
 > [!NOTE]
 > 1. The `DATE` argument is the ISO date that is part of the image tag. In the
 >    above example, the date is `20250909`.
-> 2. If the `attest-provenance` command fails, with an indication that the image
+> 2. If the attestation verification fails, with an indication that the image
 >    was built by an older commit, then there may be an explanation: If two CI
 >    runs — usually within the same day — ended up building the exact same image,
 >    then only the oldest image will be pushed, and anecdotally one attestation.
