@@ -254,6 +254,57 @@ def verify_attestation(image_name, repository, workflow):
     return True
 
 
+def get_debian_archive_date(digest):
+    if "@sha256:" not in digest:
+        raise RuntimeError(
+            "Must pass full image name along with the digest to make autodetection work"
+        )
+    crane_binary = ensure_tool("crane")
+    result = run_cmd(
+        [crane_binary, "manifest", digest],
+        capture_output=True,
+        check=True,
+    )
+    try:
+        manifest = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Failed to parse manifest JSON for {digest}: {e}") from e
+
+    annotations = manifest.get("annotations")
+    if not annotations:
+        raise RuntimeError(
+            f"Image {digest} is a multi-platform manifest index and does not contain "
+            "top-level annotations. Use a specific platform image digest instead "
+            "(e.g., ghcr.io/repo@sha256:<platform-digest>), or provide the date manually "
+            "with --debian-archive-date."
+        )
+
+    date = annotations.get("rocks.dangerzone.debian_archive_date")
+    if not date:
+        raise RuntimeError(
+            f"Image {digest} does not have the expected "
+            "'rocks.dangerzone.debian_archive_date' annotation. "
+            f"Available annotations: {list(annotations.keys())}"
+        )
+
+    return date
+
+
+def reproduce_image(*, platform, runtime, cache, date, digest, dry=False):
+    build_image(
+        platform=platform,
+        runtime=runtime,
+        cache=cache,
+        date=date,
+        dry=dry,
+    )
+    if dry:
+        logger.info("Would analyze the tarball against digest: %s", digest)
+        return
+    tarball_path = PROJECT_ROOT / "container.tar"
+    analyze_tarball(tarball_path, digest, show_contents=True)
+
+
 def build_image(
     *,
     platform=None,
@@ -389,6 +440,58 @@ def verify_attestation_cmd(image, repository, workflow):
     ensure_tool("cosign")
     verify_attestation(image, repository, workflow)
     click.echo("✅ Provenance attestation verified successfully")
+
+
+@cli.command()
+@click.option(
+    "--platform",
+    default=None,
+    help="The platform for building the image",
+)
+@click.option(
+    "--runtime",
+    type=click.Choice(["docker", "podman"]),
+    default=CONTAINER_RUNTIME,
+    help="The container runtime for building the image",
+)
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    default=False,
+    help="Do not use existing cached images for the container build",
+)
+@click.option(
+    "--debian-archive-date",
+    default=None,
+    help="Use a specific Debian snapshot archive, by its date, or 'autodetect'",
+)
+@click.option(
+    "--dry",
+    is_flag=True,
+    default=False,
+    help="Do not run any commands, just print what would happen",
+)
+@click.argument("digest")
+def reproduce(platform, runtime, no_cache, debian_archive_date, dry, digest):
+    """Reproduce a container image and verify its digest."""
+    logger.info("Reproducing container image for digest %s", digest)
+    ensure_tool("crane")
+    date = debian_archive_date
+
+    if debian_archive_date == "autodetect":
+        logger.info("Autodetecting Debian archive date for image %s", digest)
+        date = get_debian_archive_date(digest)
+        logger.info("Successfully retrieved Debian archive date: %s", date)
+
+    logger.info("Building container image")
+    reproduce_image(
+        platform=platform,
+        runtime=runtime,
+        cache=not no_cache,
+        date=date,
+        digest=digest,
+        dry=dry,
+    )
 
 
 if __name__ == "__main__":
