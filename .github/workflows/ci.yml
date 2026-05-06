@@ -43,6 +43,9 @@ jobs:
           python-version: "3.13"
           enable-cache: true
 
+      - name: Install dependencies
+        run: uv venv && uv pip install -e ".[dev]"
+
       - name: Get current date
         id: date
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
@@ -51,23 +54,22 @@ jobs:
         id: cache-container-image
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          key: v5-${{ steps.date.outputs.date }}-${{ hashFiles('Dockerfile', 'conversion/*.py', 'container_helpers/*', 'build-image.py') }}
+          key: v5-${{ steps.date.outputs.date }}-${{ hashFiles('Dockerfile', 'conversion/*.py', 'container_helpers/*', 'src/scripts/image.py') }}
           path: |
             container.tar
             image-id.txt
 
       - name: Build Dangerzone image
         if: ${{ steps.cache-container-image.outputs.cache-hit != 'true' }}
+        env:
+          DATE: ${{ steps.date.outputs.date }}
         run: |
-          python3 build-image.py -d ${{ steps.date.outputs.date }}
+          uv run image build -d "$DATE"
 
       - name: Load local image for tests
         run: |
           podman load -i container.tar
           cp image-id.txt tests/share/image-id.txt
-
-      - name: Install dependencies
-        run: uv venv && uv pip install -e ".[dev]"
 
       - name: Run tests
         run: uv run pytest

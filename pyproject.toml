@@ -7,7 +7,7 @@ authors = [
 ]
 description = "Internal (INSECURE!) Dangerzone document to pixels conversion."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "pymupdf",
     "python-magic",
@@ -16,8 +16,11 @@ license-files = ["LICENSE"]
 
 [dependency-groups]
 dev = [
+    "click",
+    "mazette",
     "pytest",
     "pytest-asyncio",
+    "repro-build",
     "ruff",
     "ty",
 ]
@@ -26,14 +29,14 @@ dev = [
 requires = ["uv_build>=0.10.7,<0.11.0"]
 build-backend = "uv_build"
 
+[project.scripts]
+image = "scripts.image:cli"
+
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["F", "I"]
-
-[tool.ty.src]
-exclude = ["utils"]
 
 [tool.mazette.asset.cosign]
 repo = "sigstore/cosign"
