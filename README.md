@@ -125,7 +125,7 @@ uv run image verify-attestation --image <FULL_IMAGE_REF> [OPTIONS]
 **Options:**
 *   `--image <REF>`: Full image reference (e.g., `ghcr.io/foo/bar@sha256:...`). **Required.**
 *   `--repository <REPO>`: GitHub repository to verify against (default: `freedomofpress/dangerzone-image`).
-*   `--workflow <PATH>`: GitHub Actions workflow path (default: `.github/workflows/release-container-image.yml`).
+*   `--workflow <PATH>`: GitHub Actions workflow path (default: `.github/workflows/release.yml`).
 
 **Example:**
 ```bash

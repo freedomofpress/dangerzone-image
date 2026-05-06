@@ -1,5 +1,12 @@
-
 # Container image reproducibility
+
+> [!IMPORTANT]
+> The workflow and tooling for building and reproducing images was significantly
+> reworked on 2026-04-28. If you need to reproduce an image built before this
+> date, follow the [old reproducibility guide] from `freedomofpress/dangerzone`
+> at tag `v0.10.0`.
+
+[old reproducibility guide]: https://github.com/freedomofpress/dangerzone/blob/v0.10.0/docs/developer/reproducibility.md
 
 ## Updating the image
 

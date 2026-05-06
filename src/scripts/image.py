@@ -24,7 +24,7 @@ import tempfile
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from repro_build.repro_build import Builder, analyze_tarball
+from repro_build import Builder, analyze_tarball
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +34,37 @@ BUILD_CONTEXT = "src"
 CONTAINER_RUNTIME = "podman"
 ANNOTATION_DATE = "rocks.dangerzone.debian_archive_date={date}"
 
+# NOTE: You can grab the SLSA attestation for an image/tag pair with the following
+# commands:
+#
+#     IMAGE=ghcr.io/freedomofpress/dangerzone/v1
+#     TAG=20260427-0.10.0-55-ga6750d1
+#     DIGEST=$(crane digest ${IMAGE?}:${TAG?})
+#     ATT_MANIFEST=${IMAGE?}:${DIGEST/:/-}.att
+#     ATT_BLOB=${IMAGE?}@$(crane manifest ${ATT_MANIFEST?} | jq -r '.layers[0].digest')
+#     crane blob ${ATT_BLOB?} | jq -r '.payload' | base64 -d | jq
 CUE_POLICY = r"""
 // The predicateType field must match this string
 predicateType: "https://slsa.dev/provenance/v0.2"
 
 predicate: {{
+  // This condition verifies that the builder is the builder we
+  // expect and trust. The following condition can be used
+  // unmodified. It verifies that the builder is the container
+  // workflow.
   builder: {{
     id: =~"^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v[0-9]+.[0-9]+.[0-9]+$"
   }}
   invocation: {{
     configSource: {{
+      // This condition verifies the entrypoint of the workflow.
+      // Replace with the relative path to your workflow in your
+      // repository.
       entryPoint: "{workflow}"
+
+      // This condition verifies that the image was generated from
+      // the source repository we expect. Replace this with your
+      // repository.
       uri: =~"^git\\+https://github.com/{repository}"
     }}
   }}
@@ -206,15 +226,7 @@ def verify_attestation(image_name, repository, workflow):
         try:
             subprocess.run(cmd, check=True, capture_output=True, env=os.environ.copy())
         except subprocess.CalledProcessError as e:
-            stderr = e.stderr.decode().strip()
-            if not stderr:
-                stderr = (
-                    "cosign exited with no error output. This usually means:\n"
-                    "  - The image tag doesn't have an attached SLSA attestation\n"
-                    "  - Use the image digest (ghcr.io/repo@sha256:...) instead of a tag\n"
-                    "  - The attestation may not exist for this image reference"
-                )
-            raise RuntimeError(f"Attestation cannot be verified: {stderr}")
+            raise Exception(f"Attestation cannot be verified: {e.stderr.decode()}")
         finally:
             Path(policy_f.name).unlink(missing_ok=True)
 
@@ -277,22 +289,14 @@ def cmd_reproduce(args):
         logger.info("Successfully retrieved Debian archive date: %s", date)
 
     logger.info("Building container image")
-    build_image(
+    reproduce_image(
         platform=args.platform,
         runtime=args.runtime,
         cache=not args.no_cache,
         date=date,
+        digest=args.digest,
         dry=args.dry,
     )
-
-    if not args.dry:
-        logger.info(
-            "Check that the reproduced image has the expected digest: %s", args.digest
-        )
-        tarball_path = PROJECT_ROOT / "container.tar"
-        analyze_tarball(tarball_path, args.digest, show_contents=True)
-    else:
-        logger.info("Would analyze the tarball against digest: %s", args.digest)
 
 
 def get_candidate_image(commit, image_name):
@@ -388,7 +392,7 @@ def get_platform_digests(full_image):
     return platforms
 
 
-def reproduce_image(
+def run_reproduce_cmd_in_tmpdir(
     root_manifest, platform_name, platform_image_digest, temp_dir, dry=False
 ):
     image_base = root_manifest.split("@")[0]
@@ -417,6 +421,18 @@ def reproduce_image(
         dry=dry,
     )
     print(f"\nImage reproduction successful for {platform_name}\n")
+
+
+def reproduce_image(*, platform, runtime, cache, date, digest, dry=False):
+    build_image(
+        platform=platform,
+        runtime=runtime,
+        cache=cache,
+        date=date,
+        dry=dry,
+    )
+    tarball_path = PROJECT_ROOT / "container.tar"
+    analyze_tarball(tarball_path, digest, show_contents=True)
 
 
 def sign_image(image, ghcr_signer_path):
@@ -489,7 +505,7 @@ def cmd_release(args):
                     f"Skipping reproduction for platform {plat} (digest {platform_digest})"
                 )
             else:
-                reproduce_image(
+                run_reproduce_cmd_in_tmpdir(
                     root_manifest,
                     plat,
                     platform_digest,
@@ -595,7 +611,7 @@ def create_parser():
     )
     verify_parser.add_argument(
         "--workflow",
-        default=".github/workflows/release-container-image.yml",
+        default=".github/workflows/release.yml",
         help="The workflow to use",
     )
 
