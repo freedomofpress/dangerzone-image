@@ -34,7 +34,7 @@ commit this image was built from (you can find it from the image tag in its
 tag), and run the following command in any environment:
 
 ```bash
-./utils/reproduce-image.py \
+uv run image reproduce \
     --debian-archive-date <date> \
     <digest>
 ```
@@ -69,7 +69,7 @@ This should return a date like `20251008`.
 
 > [!TIP]
 > You can pass the full image name and the `--debian-archive-date autodetect`
-> option in the `reproduce_image.py` script, to grab the Debian archive date
+> option in the `image reproduce` command, to grab the Debian archive date
 > from the annotation automatically.
 
 Getting the Git commit that the image was built from:
