@@ -27,7 +27,7 @@ jobs:
 
       - name: Build container image
         run: |
-          python3 build-image.py \
+          uv run image build \
             --debian-archive-date $(date "+%Y%m%d") \
             --runtime docker
           docker load -i container.tar
