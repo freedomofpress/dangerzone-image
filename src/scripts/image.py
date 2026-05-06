@@ -51,8 +51,6 @@ predicate: {{
 }}
 """
 
-REQUIRED_TOOLS = ["crane"]
-
 
 def run_cmd(cmd, check=True, capture_output=False, dry=False, **kwargs):
     action = "Would have run" if dry else "Running"
@@ -224,6 +222,7 @@ def verify_attestation(image_name, repository, workflow):
 
 
 def cmd_verify_attestation(args):
+    ensure_tool("cosign")
     verify_attestation(args.image, args.repository, args.workflow)
     print("Provenance attestation verified successfully")
 
@@ -269,6 +268,7 @@ def get_debian_archive_date(digest):
 
 
 def cmd_reproduce(args):
+    ensure_tool("crane")
     date = args.debian_archive_date
 
     if args.debian_archive_date == "autodetect":
@@ -447,7 +447,7 @@ def sign_image(image, ghcr_signer_path):
 
 
 def cmd_release(args):
-    for tool in REQUIRED_TOOLS:
+    for tool in ["crane", "cosign"]:
         ensure_tool(tool)
 
     if not shutil.which("git"):
