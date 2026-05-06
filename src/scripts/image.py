@@ -34,6 +34,43 @@ BUILD_CONTEXT = "src"
 CONTAINER_RUNTIME = "podman"
 ANNOTATION_DATE = "rocks.dangerzone.debian_archive_date={date}"
 
+# NOTE: You can grab the SLSA attestation for an image/tag pair with the following
+# commands:
+#
+#     IMAGE=ghcr.io/freedomofpress/dangerzone/v1
+#     TAG=20260427-0.10.0-55-ga6750d1
+#     DIGEST=$(crane digest ${IMAGE?}:${TAG?})
+#     ATT_MANIFEST=${IMAGE?}:${DIGEST/:/-}.att
+#     ATT_BLOB=${IMAGE?}@$(crane manifest ${ATT_MANIFEST?} | jq -r '.layers[0].digest')
+#     crane blob ${ATT_BLOB?} | jq -r '.payload' | base64 -d | jq
+CUE_POLICY = r"""
+// The predicateType field must match this string
+predicateType: "https://slsa.dev/provenance/v0.2"
+
+predicate: {{
+  // This condition verifies that the builder is the builder we
+  // expect and trust. The following condition can be used
+  // unmodified. It verifies that the builder is the container
+  // workflow.
+  builder: {{
+    id: =~"^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v[0-9]+.[0-9]+.[0-9]+$"
+  }}
+  invocation: {{
+    configSource: {{
+      // This condition verifies the entrypoint of the workflow.
+      // Replace with the relative path to your workflow in your
+      // repository.
+      entryPoint: "{workflow}"
+
+      // This condition verifies that the image was generated from
+      // the source repository we expect. Replace this with your
+      // repository.
+      uri: =~"^git\\+https://github.com/{repository}"
+    }}
+  }}
+}}
+"""
+
 
 def run_cmd(cmd, check=True, capture_output=False, dry=False, **kwargs):
     action = "Would have run" if dry else "Running"
@@ -93,6 +130,39 @@ def get_git_head():
         check=True,
     )
     return result.stdout.strip()
+
+
+def verify_attestation(image_name, repository, workflow):
+    cosign_binary = ensure_tool("cosign")
+
+    policy = CUE_POLICY.format(repository=repository, workflow=workflow)
+
+    with NamedTemporaryFile(mode="w", suffix=".cue", delete=False) as policy_f:
+        policy_f.write(policy)
+        policy_f.flush()
+
+        cmd = [
+            cosign_binary,
+            "verify-attestation",
+            "--type",
+            "slsaprovenance",
+            "--policy",
+            policy_f.name,
+            "--certificate-oidc-issuer",
+            "https://token.actions.githubusercontent.com",
+            "--certificate-identity-regexp",
+            r"^https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@refs/tags/v[0-9]+.[0-9]+.[0-9]+$",
+            image_name,
+        ]
+
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, env=os.environ.copy())
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Attestation cannot be verified: {e.stderr.decode()}")
+        finally:
+            Path(policy_f.name).unlink(missing_ok=True)
+
+    return True
 
 
 def build_image(
@@ -203,6 +273,29 @@ def build(runtime, platform, output, no_cache, tag, debian_archive_date, dry):
         tag=image_name_tagged,
         output=output,
     )
+
+
+@cli.command("verify-attestation")
+@click.option(
+    "--image",
+    required=True,
+    help="Full image reference (e.g., ghcr.io/foo/bar@sha256:...)",
+)
+@click.option(
+    "--repository",
+    default="freedomofpress/dangerzone-image",
+    help="The repository to use",
+)
+@click.option(
+    "--workflow",
+    default=".github/workflows/release.yml",
+    help="The workflow to use",
+)
+def verify_attestation_cmd(image, repository, workflow):
+    """Verify SLSA provenance attestation for an image."""
+    ensure_tool("cosign")
+    verify_attestation(image, repository, workflow)
+    click.echo("✅ Provenance attestation verified successfully")
 
 
 if __name__ == "__main__":
