@@ -209,7 +209,6 @@ def verify_attestation(image_name, repository, workflow):
             subprocess.run(cmd, check=True, capture_output=True, env=os.environ.copy())
         except subprocess.CalledProcessError as e:
             stderr = e.stderr.decode().strip()
-            breakpoint()
             if not stderr:
                 stderr = (
                     "cosign exited with no error output. This usually means:\n"
@@ -247,9 +246,7 @@ def get_debian_archive_date(digest):
     try:
         manifest = json.loads(resp)
     except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f"Failed to parse manifest JSON for {digest}: {e}"
-        ) from e
+        raise RuntimeError(f"Failed to parse manifest JSON for {digest}: {e}") from e
 
     annotations = manifest.get("annotations")
     if not annotations:
@@ -333,9 +330,7 @@ def get_candidate_image(commit, image_name):
         check=True,
     )
     if not result or not result.stdout.strip():
-        raise RuntimeError(
-            f"Failed to get digest for image {latest_image}"
-        )
+        raise RuntimeError(f"Failed to get digest for image {latest_image}")
     digest = result.stdout.strip()
 
     image_base = latest_image.split(":")[0]
@@ -377,8 +372,7 @@ def get_platform_digests(full_image):
             plat_digest = m["digest"]
         except KeyError as e:
             raise RuntimeError(
-                f"Invalid manifest entry in {full_image}: missing key {e}. "
-                f"Entry: {m}"
+                f"Invalid manifest entry in {full_image}: missing key {e}. Entry: {m}"
             ) from e
         platforms[plat_key] = plat_digest
 
@@ -528,12 +522,12 @@ def add_build_args(parser):
         "--runtime",
         choices=["docker", "podman"],
         default=CONTAINER_RUNTIME,
-        help=f"The container runtime for building the image (default: {CONTAINER_RUNTIME})",
+        help="The container runtime for building the image",
     )
     parser.add_argument(
         "--platform",
         default=None,
-        help="The platform for building the image (default: current platform)",
+        help="The platform for building the image",
     )
     parser.add_argument(
         "--output",
@@ -576,13 +570,17 @@ def create_parser():
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     build_parser = subparsers.add_parser(
-        "build", help="Build a reproducible container image"
+        "build",
+        help="Build a reproducible container image",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     build_parser.set_defaults(func=cmd_build)
     add_build_args(build_parser)
 
     verify_parser = subparsers.add_parser(
-        "verify-attestation", help="Verify SLSA provenance attestation for an image"
+        "verify-attestation",
+        help="Verify SLSA provenance attestation for an image",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     verify_parser.set_defaults(func=cmd_verify_attestation)
     verify_parser.add_argument(
@@ -591,26 +589,32 @@ def create_parser():
         help="Full image reference (e.g., ghcr.io/foo/bar@sha256:...)",
     )
     verify_parser.add_argument(
-        "--repository", default="freedomofpress/dangerzone-image"
+        "--repository",
+        default="freedomofpress/dangerzone-image",
+        help="The repository to use",
     )
     verify_parser.add_argument(
-        "--workflow", default=".github/workflows/release-container-image.yml"
+        "--workflow",
+        default=".github/workflows/release-container-image.yml",
+        help="The workflow to use",
     )
 
     reproduce_parser = subparsers.add_parser(
-        "reproduce", help="Reproduce a container image and verify its digest"
+        "reproduce",
+        help="Reproduce a container image and verify its digest",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     reproduce_parser.set_defaults(func=cmd_reproduce)
     reproduce_parser.add_argument(
         "--platform",
         default=None,
-        help="The platform for building the image (default: current platform)",
+        help="The platform for building the image",
     )
     reproduce_parser.add_argument(
         "--runtime",
         choices=["docker", "podman"],
         default=CONTAINER_RUNTIME,
-        help=f"The container runtime for building the image (default: {CONTAINER_RUNTIME})",
+        help="The container runtime for building the image",
     )
     reproduce_parser.add_argument(
         "--no-cache",
@@ -635,14 +639,16 @@ def create_parser():
     )
 
     release_parser = subparsers.add_parser(
-        "release", help="Attest, reproduce, and release a container image"
+        "release",
+        help="Attest, reproduce, and release a container image",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     release_parser.set_defaults(func=cmd_release)
     release_parser.add_argument(
         "--commit",
         default=None,
         type=validate_commit_format,
-        help="The full SHA1 commit to use. Defaults to the git HEAD of the current branch.",
+        help="The full SHA1 commit to use",
     )
     release_parser.add_argument(
         "--ghcr-signer-path",
@@ -655,9 +661,15 @@ def create_parser():
         help="The repository to use",
     )
     release_parser.add_argument(
-        "--workflow", default=".github/workflows/release-container-image.yml"
+        "--workflow",
+        default=".github/workflows/release.yml",
+        help="The workflow to use",
     )
-    release_parser.add_argument("--image-name", default=IMAGE_NAME)
+    release_parser.add_argument(
+        "--image-name",
+        default=IMAGE_NAME,
+        help="The image name to use",
+    )
     release_parser.add_argument(
         "--skip-reproduction-for",
         help="Digests to avoid reproducing",
