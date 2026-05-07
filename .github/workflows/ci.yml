@@ -69,3 +69,19 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      - name: Upload pixel diff artifacts
+        if: failure() && hashFiles('tests/_diff_artifacts/diff.html') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pixel-diff
+          path: tests/_diff_artifacts/
+
+      - name: Annotate run with diff link
+        if: failure() && hashFiles('tests/_diff_artifacts/diff.html') != ''
+        run: |
+          {
+            echo "### Reference version mismatch";
+            echo "";
+            echo "The test-produced and reference versions differ. Browse PDFs side by side by using the `pixel-diff` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"

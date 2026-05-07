@@ -80,6 +80,31 @@ uv run pytest --local
 
 # It's also possible to run tests in parallel if you have multiple cores:
 uv run --with pytest-xdist pytest -n 6
+
+# To build the image and run the tests in one command:
+uv run pytest --build
+```
+
+#### Reference versions
+
+To make sure we generate the same documents given the same input, a reference
+version is kept in-source and used to do comparisons when running the tests. In
+case they differ, a `diff.html` page will be generated to help see the
+differences. You can open it with:
+
+```bash
+open tests/_diff_artifacts/diff.html
+```
+
+In CI, the same artifacts are uploaded as `pixel-diff` on test failure.
+Download the artifact and open `diff.html` locally.
+
+#### Regenerating reference pixel data
+
+When you are sure you want to regenerate these reference versions, do so with:
+
+```bash
+uv run pytest --update-pixel-references
 ```
 
 ## Building and Reproducing the Image
