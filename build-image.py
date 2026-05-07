@@ -36,6 +36,7 @@ def determine_git_tag():
                 "describe",
                 "--long",
                 "--first-parent",
+                "--always",
                 f"--dirty=-{dirty_ident}",
             ],
         )

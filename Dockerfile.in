@@ -32,6 +32,8 @@ RUN \
   : "Install the necessary gVisor and Dangerzone dependencies" && \
   apt-get update && \
   apt-get install -y --no-install-recommends \
+      -o Dpkg::Options::="--path-exclude=/usr/share/doc/*" \
+      -o Dpkg::Options::="--path-exclude=/usr/share/man/*" \
       python3 python3-fitz libreoffice-nogui libreoffice-java-common \
       python3-magic default-jre-headless fonts-noto-cjk fonts-dejavu \
       runsc unzip && \
@@ -42,6 +44,36 @@ RUN \
   dpkg-deb --extract libreoffice-h2orestart_*.deb /tmp/h2orestart && \
   mv /tmp/h2orestart/usr/lib/libreoffice/share/extensions/h2orestart /opt/libreoffice_ext/ && \
   rm -rf /tmp/h2orestart libreoffice-h2orestart_*.deb && \
+  : "Reproducibility utils: strip_path is a way to detect when files to be removed are missing" && \
+  MULTIARCH_DIR=$(echo /usr/lib/*-linux-gnu) && \
+  test -d "${MULTIARCH_DIR}" || { echo "strip: could not locate multiarch lib dir" >&2; exit 1; } && \
+  strip_path() { for p in "$@"; do test -e "$p" || { echo "strip: missing $p" >&2; exit 1; }; rm -rf "$p"; done; } && \
+  : "gVisor: drop some binaries we don't use" && \
+  strip_path \
+      /usr/bin/runsc-metric-server \
+      /usr/bin/containerd-shim-runsc-v1 && \
+  : "Libreoffice: remove unused libraries" && \
+  : "Do not remove libwpg (WordPerfect Graphics) as it might be used by .odg files" && \
+  for lib in libabw libcdr libe-book libetonyek libfreehand libmspub \
+             libmwaw libpagemaker libqxp libstaroffice libvisio \
+             libwpd libwps libzmf; do \
+    matches=$(ls ${MULTIARCH_DIR}/${lib}-*.so* 2>/dev/null) && \
+    test -n "${matches}" || { echo "strip: no files matched ${lib}-*" >&2; exit 1; } && \
+    rm -f ${MULTIARCH_DIR}/${lib}-*.so*; \
+  done && \
+  : "Libreoffice: drop some GUI artifacts that are never loaded and only keep the default theme (colibre)" && \
+  strip_path \
+      /usr/lib/libreoffice/share/gallery \
+      /usr/lib/libreoffice/share/template \
+      /usr/lib/libreoffice/share/wizards \
+      /usr/lib/libreoffice/share/basic \
+      /usr/lib/libreoffice/share/autotext \
+      /usr/lib/libreoffice/share/autocorr \
+      /usr/share/libreoffice/share/config/images_colibre_dark.zip \
+      /usr/share/libreoffice/share/config/images_colibre_svg.zip \
+      /usr/share/libreoffice/share/config/images_colibre_dark_svg.zip && \
+  : "Drop doc and manpages, not required for this image to function" && \
+  rm -rf /usr/share/doc /usr/share/man && \
   : "Clean up for improving reproducibility (optional)" && \
   rm -rf /var/cache/fontconfig/ && \
   rm -rf /etc/ssl/certs/java/cacerts && \

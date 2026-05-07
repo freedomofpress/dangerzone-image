@@ -2,3 +2,4 @@ image-id.txt
 container.tar
 .python-version
 *.pyc
+tests/_diff_artifacts/
