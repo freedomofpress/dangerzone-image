@@ -1,9 +1,14 @@
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from typing import List
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+BUILD_IMAGE_SCRIPT = REPO_ROOT / "src" / "scripts" / "image.py"
+IMAGE_ID_FILE = REPO_ROOT / "image-id.txt"
 
 # Add src directory to Python path for imports
 # src_dir = Path(__file__).parent.parent / "src"
@@ -99,16 +104,37 @@ def get_runtime_security_args() -> List[str]:
     return security_args
 
 
+def build_image() -> None:
+    """Invoke the image.py script and load the resulting tarball into podman"""
+    subprocess.run(
+        [sys.executable, str(BUILD_IMAGE_SCRIPT), "build"],
+        check=True,
+        cwd=REPO_ROOT,
+    )
+    if not IMAGE_ID_FILE.exists():
+        raise pytest.UsageError(
+            f"image.py did not produce {IMAGE_ID_FILE}. Build may have failed silently."
+        )
+    tarball = REPO_ROOT / "container.tar"
+    if not tarball.exists():
+        raise pytest.UsageError(f"image.py did not produce {tarball}.")
+    subprocess.run(
+        ["podman", "load", "-i", str(tarball)],
+        check=True,
+        cwd=REPO_ROOT,
+    )
+
+
 @pytest.fixture
 def container_image(request: pytest.FixtureRequest) -> str:
     """Return the container image to use for container conversion tests."""
-    image = (_DANGERZONE_SHARE_DIR / "image-id.txt").read_text().strip()
-    if not image:
-        image = request.config.getoption("--container-image")
+    image = request.config.getoption("--container-image")
+    if not image and IMAGE_ID_FILE.exists():
+        image = IMAGE_ID_FILE.read_text().strip()
     if not image:
         raise pytest.UsageError(
-            "No container image available. Provide --container-image or populate "
-            "tests/share/image-id.txt, or use --local."
+            "No container image available. Provide --container-image, run with "
+            "--build, or use --local."
         )
     return image
 
@@ -143,6 +169,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Run conversion tests locally instead of in a container",
     )
+    parser.addoption(
+        "--build",
+        action="store_true",
+        default=False,
+        help="Build the container image via build-image.py before running tests.",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -151,10 +183,17 @@ def pytest_configure(config: pytest.Config) -> None:
             "--update-pixel-references must run in a container; do not combine with "
             "--local."
         )
+    if config.getoption("--build") and config.getoption("--local"):
+        raise pytest.UsageError(
+            "--build is meaningless with --local (no container is used)."
+        )
+    if config.getoption("--build") and config.getoption("--container-image"):
+        raise pytest.UsageError("--build and --container-image are mutually exclusive.")
+    if config.getoption("--build"):
+        build_image()
     if not config.getoption("--local"):
-        image = (_DANGERZONE_SHARE_DIR / "image-id.txt").read_text().strip()
-        if not image and not config.getoption("--container-image"):
+        if not config.getoption("--container-image") and not IMAGE_ID_FILE.exists():
             raise pytest.UsageError(
-                "No container image available. Provide --container-image or populate "
-                "tests/share/image-id.txt, or use --local."
+                "No container image available. Provide --container-image, run "
+                "with --build, or use --local."
             )

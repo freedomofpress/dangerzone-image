@@ -67,9 +67,7 @@ jobs:
           uv run image build -d "$DATE"
 
       - name: Load local image for tests
-        run: |
-          podman load -i container.tar
-          cp image-id.txt tests/share/image-id.txt
+        run: podman load -i container.tar
 
       - name: Run tests
         run: uv run pytest
