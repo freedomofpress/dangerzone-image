@@ -3,3 +3,4 @@ container.tar
 .python-version
 *.pyc
 helpers/
+tests/_diff_artifacts/

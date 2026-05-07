@@ -13,7 +13,86 @@ from dangerzone_insecure_converter.doc_to_pixels import DocumentToPixels
 from .conftest import TEST_DOCS_DIRECTORY, for_each_doc
 
 REFERENCE_DIR = Path(__file__).parent / "test_docs" / "reference"
+DIFF_ARTIFACTS_DIR = Path(__file__).parent / "_diff_artifacts"
 _GZIP_MAGIC = b"\x1f\x8b"
+
+
+def dump_pixel_diff(doc_name: str, actual: bytes, reference: bytes) -> Path:
+    """Write per-page PNGs for actual and reference output side-by-side.
+
+    Returns the directory containing the artifacts. Also (re)writes
+    `_diff_artifacts/diff.html`, an index of all artifact subdirectories
+    that pairs actual and reference pages for visual inspection.
+    """
+    import fitz
+
+    out_dir = DIFF_ARTIFACTS_DIR / doc_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    for label, data in (("actual", actual), ("reference", reference)):
+        try:
+            pages = parse_pixel_output(data)
+        except Exception as e:
+            (out_dir / f"{label}.parse-error.txt").write_text(repr(e))
+            continue
+        for i, (width, height, rgb) in enumerate(pages, start=1):
+            pix = fitz.Pixmap(fitz.csRGB, width, height, rgb, 0)
+            pix.save(str(out_dir / f"{label}-page-{i:03d}.png"))
+
+    write_diff_index()
+    return out_dir
+
+
+def write_diff_index() -> None:
+    """Generate `_diff_artifacts/diff.html` from whatever subdirs currently exist.
+
+    Pairs each actual-page-NNN.png with its reference-page-NNN.png by filename.
+    Idempotent — safe to call after every dump.
+    """
+    docs = []
+    for sub in sorted(DIFF_ARTIFACTS_DIR.iterdir()):
+        if not sub.is_dir():
+            continue
+        page_nums = sorted(
+            int(p.stem.rsplit("-", 1)[1])
+            for p in sub.glob("actual-page-*.png")
+        )
+        if page_nums:
+            docs.append((sub.name, page_nums))
+
+    rows = []
+    for name, pages in docs:
+        rows.append(f'<h2 id="{name}">{name}</h2>')
+        for i in pages:
+            p = f"{i:03d}"
+            rows.append(
+                '<div class="pair">'
+                f'<figure><figcaption>actual page {i}</figcaption>'
+                f'<img src="{name}/actual-page-{p}.png" loading="lazy"></figure>'
+                f'<figure><figcaption>reference page {i}</figcaption>'
+                f'<img src="{name}/reference-page-{p}.png" loading="lazy"></figure>'
+                "</div>"
+            )
+
+    nav = " ".join(f'<a href="#{name}">{name}</a>' for name, _ in docs)
+    html = f"""<!doctype html>
+<html><head><meta charset="utf-8"><title>Pixel diff</title>
+<style>
+  body {{ font-family: -apple-system, sans-serif; margin: 24px; background: #1a1a1a; color: #ddd; }}
+  h1 {{ font-size: 18px; }}
+  h2 {{ font-size: 16px; margin-top: 32px; border-bottom: 1px solid #444; padding-bottom: 6px; }}
+  .pair {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }}
+  .pair figure {{ margin: 0; }}
+  .pair figcaption {{ font-size: 12px; color: #888; margin-bottom: 4px; }}
+  .pair img {{ width: 100%; border: 1px solid #333; background: white; }}
+  nav a {{ color: #6cf; margin-right: 12px; }}
+</style></head><body>
+<h1>Pixel diff: actual (left) vs reference (right)</h1>
+<nav>{nav}</nav>
+{''.join(rows)}
+</body></html>
+"""
+    (DIFF_ARTIFACTS_DIR / "diff.html").write_text(html)
 
 
 class CapturingDocumentToPixels(DocumentToPixels):
@@ -135,10 +214,15 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
             REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
             write_reference_data(reference_bin, pixel_data)
         elif reference_bin.exists():
-            assert pixel_data == read_reference_data(reference_bin), (
-                f"Pixel data does not match reference for {doc.name}. "
-                "Run with --update-pixel-references to regenerate."
-            )
+            reference_data = read_reference_data(reference_bin)
+            if pixel_data != reference_data:
+                dump_pixel_diff(doc.name, pixel_data, reference_data)
+                pytest.fail(
+                    f"Pixel data does not match reference for {doc.name}. "
+                    f"Open {DIFF_ARTIFACTS_DIR / 'diff.html'} in a browser "
+                    "to compare actual vs reference. "
+                    "Run with --update-pixel-references to regenerate."
+                )
 
     # Parse and validate pixel data structure
     pages = parse_pixel_output(pixel_data)
