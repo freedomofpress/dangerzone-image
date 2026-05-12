@@ -1,7 +1,7 @@
 
 # Container image reproducibility
 
-> [!IMPORTANT]
+> [!NOTE]
 > The workflow and tooling for building and reproducing images was significantly
 > reworked on 2026-04-28. If you need to reproduce an image built before this
 > date, follow the [old reproducibility guide] from `freedomofpress/dangerzone`
