@@ -21,6 +21,7 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "repro-build",
+    "pytest-test-groups",
     "ruff",
     "ty",
 ]
