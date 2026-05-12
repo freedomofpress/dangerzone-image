@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -33,6 +34,8 @@ IMAGE_NAME = "ghcr.io/freedomofpress/dangerzone/v1"
 BUILD_CONTEXT = "src"
 CONTAINER_RUNTIME = "podman"
 ANNOTATION_DATE = "rocks.dangerzone.debian_archive_date={date}"
+CACHE_DIR = Path(tempfile.gettempdir()) / "dangerzone-reproduce-cache"
+CACHE_TTL = timedelta(hours=2)
 
 # NOTE: You can grab the SLSA attestation for an image/tag pair with the following
 # commands:
@@ -80,6 +83,66 @@ def run_cmd(cmd, check=True, capture_output=False, dry=False, **kwargs):
     return subprocess.run(
         cmd, check=check, capture_output=capture_output, text=True, **kwargs
     )
+
+
+def _is_dirty():
+    result = subprocess.run(
+        ["git", "status", "--porcelain"], capture_output=True, text=True
+    )
+    return bool(result.stdout.strip())
+
+
+def _reproduce_cache_path(digest):
+    digest = digest.replace("sha256:", "sha256-").replace("/", "_")
+    return CACHE_DIR / f"{digest}.json"
+
+
+def _consult_reproduce_cache(digest, commit, repository, image_name):
+    path = _reproduce_cache_path(digest)
+    if not path.exists():
+        return False
+    data = json.loads(path.read_text())
+    cached_time = datetime.fromisoformat(data["timestamp"])
+    if datetime.utcnow() - cached_time > CACHE_TTL:
+        logger.debug("Reproduce cache for %s is stale (TTL: %s)", digest, CACHE_TTL)
+        return False
+    return (
+        data.get("commit") == commit
+        and data.get("repository") == repository
+        and data.get("image_name") == image_name
+    )
+
+
+def _write_reproduce_cache(digest, commit, repository, image_name):
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    path = _reproduce_cache_path(digest)
+    path.write_text(
+        json.dumps(
+            {
+                "commit": commit,
+                "repository": repository,
+                "image_name": image_name,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
+    )
+
+
+def _should_skip_reproduction(
+    plat, platform_digest, skip_list, commit, repository, image_name, should_cache
+):
+    skip_msg = (
+        f"⏩ Skipping reproduction for platform {plat} (digest: {platform_digest}). "
+    )
+    if platform_digest in skip_list:
+        click.echo(skip_msg + "Explicitly skipped via --skip-reproduction-for.")
+        return True
+    if should_cache and _consult_reproduce_cache(
+        platform_digest, commit, repository, image_name
+    ):
+        click.echo(skip_msg + "Has been reproduced recently.")
+        return True
+    return False
 
 
 def locate_tool(tool_name):
@@ -657,7 +720,9 @@ def release(
     if not shutil.which("git"):
         raise RuntimeError("'git' is required but not found in PATH")
 
+    commit_provided = commit is not None
     commit = commit or get_git_head()
+    should_cache = commit_provided or not _is_dirty()
 
     root_manifest = get_candidate_image(commit, image_name)
 
@@ -688,18 +753,29 @@ def release(
 
         for plat in ["linux/amd64", "linux/arm64"]:
             platform_digest = digests[plat]
-            if platform_digest in skip_reproduction_for:
-                click.echo(
-                    f"⏩ Skipping reproduction for platform {plat} (digest {platform_digest})"
-                )
-            else:
-                run_reproduce_cmd_in_tmpdir(
-                    root_manifest,
-                    plat,
-                    platform_digest,
-                    temp_dir,
-                    dry=dry,
-                )
+            if _should_skip_reproduction(
+                plat,
+                platform_digest,
+                skip_reproduction_for,
+                commit,
+                repository,
+                image_name,
+                should_cache,
+            ):
+                continue
+            run_reproduce_cmd_in_tmpdir(
+                root_manifest,
+                plat,
+                platform_digest,
+                temp_dir,
+                dry=dry,
+            )
+            if (
+                should_cache
+                and not dry
+                and platform_digest not in skip_reproduction_for
+            ):
+                _write_reproduce_cache(platform_digest, commit, repository, image_name)
     finally:
         click.echo(f"\n🧹 Cleaning up temporary directory: {temp_dir}")
         shutil.rmtree(temp_dir, ignore_errors=True)
