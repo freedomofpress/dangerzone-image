@@ -432,10 +432,12 @@ def build_image(
 
 
 @click.group(context_settings={"show_default": True})
-def cli():
+@click.option("-v", "--verbose", count=True, default=0, help="Increase verbosity")
+def cli(verbose):
     """Unified tool for building, verifying, reproducing, and releasing Dangerzone container images."""
+    level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=level,
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
