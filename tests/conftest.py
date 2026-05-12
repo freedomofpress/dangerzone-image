@@ -1,3 +1,4 @@
+import os
 import subprocess
 import zipfile
 from pathlib import Path
@@ -11,7 +12,7 @@ import pytest
 
 TESTS_DIRECTORY = Path(__file__).parent
 SAFE_EXTENSION = "-safe.pdf"
-TEST_DOCS_DIRECTORY = TESTS_DIRECTORY / "test_docs"
+TEST_DOCS_DIRECTORY = Path(os.environ.get("TEST_DOCS_DIR", str(TESTS_DIRECTORY / "test_docs")))
 
 _DANGERZONE_SHARE_DIR = Path(__file__).parent / "share"
 
