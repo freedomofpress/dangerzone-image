@@ -1,0 +1,144 @@
+name: Large tests
+on:
+  push:
+    branches:
+      - "test/**"
+  schedule:
+    - cron: "0 3 * * 1" # Run at 03:00 on Monday
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build-container-image:
+    name: Build container image
+    runs-on: ubuntu-24.04
+    outputs:
+      date: ${{ steps.date.outputs.date }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv venv && uv pip install -e ".[dev]"
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Build container image
+        run: |
+          uv run image build -d ${{ steps.date.outputs.date }}
+
+      - name: Cache container image
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            container.tar
+            image-id.txt
+          key: v5-${{ steps.date.outputs.date }}-${{ hashFiles('Dockerfile', 'src/**/*.py', 'Dockerfile.in', 'Dockerfile.env', 'pyproject.toml') }}
+
+  run-large-tests:
+    name: Run large tests (group ${{ matrix.group }})
+    runs-on: ubuntu-24.04
+    needs:
+      - build-container-image
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv venv && uv pip install -e ".[dev]"
+
+      - name: Restore container image
+        id: cache-container-image
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            container.tar
+            image-id.txt
+          fail-on-cache-miss: true
+          key: v5-${{ needs.build-container-image.outputs.date }}-${{ hashFiles('Dockerfile', 'src/**/*.py', 'Dockerfile.in', 'Dockerfile.env', 'pyproject.toml') }}
+
+      - name: Load local image for tests
+        run: |
+          podman load -i container.tar
+          cp image-id.txt tests/share/image-id.txt
+
+      - name: Run large tests
+        continue-on-error: true
+        run: |
+          export TEST_GROUP_COUNT=20
+          export TEST_GROUP=${{ matrix.group }}
+          uv run make test
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.group }}
+          path: tests/results/
+          if-no-files-found: error
+          retention-days: 1
+
+  report:
+    name: Generate final report
+    runs-on: ubuntu-24.04
+    needs:
+      - run-large-tests
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv venv && uv pip install -e ".[dev]"
+
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/results
+          pattern: results-*
+          merge-multiple: true
+
+      - name: Combine results
+        run: |
+          mkdir -p ${{ runner.temp }}/final_results
+          uv run python dev_scripts/large_tests/merge_results.py \
+            ${{ runner.temp }}/results \
+            ${{ runner.temp }}/final_results/results.xml
+
+      - name: Generate report
+        run: |
+          uv run python dev_scripts/large_tests/report.py \
+            ${{ runner.temp }}/final_results/results.xml \
+            | tee ${{ runner.temp }}/final_results/report.txt
+
+      - name: Upload final results
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-results
+          path: ${{ runner.temp }}/final_results
+          if-no-files-found: error
