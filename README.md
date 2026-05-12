@@ -113,7 +113,7 @@ uv run image build --platform linux/amd64 --debian-archive-date 20260505
 uv run image verify-attestation --image "ghcr.io/freedomofpress/dangerzone/v1@sha256:..."
 
 # Reproduce an image and verify its digest
-uv run image reproduce --debian-archive-date 20231026 <digest>
+uv run image reproduce --debian-archive-date 20260401 <digest>
 # ... or if you don't know the exact date
 uv run image reproduce --debian-archive-date autodetect ghcr.io/freedomofpress/dangerzone/v1@sha256:<digest>
 
