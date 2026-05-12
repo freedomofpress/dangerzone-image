@@ -82,16 +82,42 @@ def run_cmd(cmd, check=True, capture_output=False, dry=False, **kwargs):
     )
 
 
-def ensure_tool(tool_name):
+def locate_tool(tool_name):
     tool_path = PROJECT_ROOT / "helpers" / tool_name / tool_name
-    if not tool_path.exists():
-        tool_path = PROJECT_ROOT / "helpers" / tool_name
-    if not tool_path.exists():
+    if tool_path.exists():
+        return str(tool_path)
+    tool_path = PROJECT_ROOT / "helpers" / tool_name
+    if tool_path.exists():
+        return str(tool_path)
+    return None
+
+
+def ensure_tool(tool_name):
+    tool = locate_tool(tool_name)
+    if tool is not None:
+        logger.debug("Found '%s' at '%s'", tool_name, tool)
+        return tool
+
+    logger.debug("'%s' not found locally, installing via Mazette", tool_name)
+    result = subprocess.run(
+        ["mazette", "install", tool_name],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
         raise RuntimeError(
-            f"'{tool_name}' is required but not found in helpers/. "
-            f"Run 'uvx mazette install' to install it."
+            f"'{tool_name}' is required but not found in helpers/ and"
+            f" could not be installed via Mazette: {result.stderr.strip()}"
         )
-    return str(tool_path)
+    logger.debug("Mazette install output: %s", result.stdout.strip())
+
+    tool = locate_tool(tool_name)
+    if tool is None:
+        raise RuntimeError(
+            f"'{tool_name}' was installed via Mazette but still not found in helpers/"
+        )
+    logger.debug("Using '%s' at '%s'", tool_name, tool)
+    return str(tool)
 
 
 def determine_git_tag():
