@@ -486,6 +486,7 @@ def cli(verbose):
 )
 def build(runtime, platform, output, no_cache, tag, debian_archive_date, dry):
     """Build a reproducible container image."""
+    logger.info("Building container image")
     if not debian_archive_date:
         debian_archive_date = determine_debian_archive_date()
 
@@ -534,6 +535,7 @@ def build(runtime, platform, output, no_cache, tag, debian_archive_date, dry):
 )
 def verify_attestation_cmd(image, repository, workflow):
     """Verify SLSA provenance attestation for an image."""
+    logger.info("Verifying SLSA provenance attestation for image %s", image)
     ensure_tool("cosign")
     verify_attestation(image, repository, workflow)
     click.echo("✅ Provenance attestation verified successfully")
@@ -571,6 +573,7 @@ def verify_attestation_cmd(image, repository, workflow):
 @click.argument("digest")
 def reproduce(platform, runtime, no_cache, debian_archive_date, dry, digest):
     """Reproduce a container image and verify its digest."""
+    logger.info("Reproducing container image for digest %s", digest)
     ensure_tool("crane")
     date = debian_archive_date
 
@@ -647,6 +650,7 @@ def release(
     dry,
 ):
     """Attest, reproduce, and release a container image."""
+    logger.info("Starting release process for commit %s", commit or "(HEAD)")
     for tool in ["crane", "cosign"]:
         ensure_tool(tool)
 
