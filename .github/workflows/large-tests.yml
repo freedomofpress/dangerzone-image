@@ -4,7 +4,7 @@ on:
     branches:
       - "test/**"
   schedule:
-    - cron: "0 3 * * 1" # Run at 03:00 on Monday
+    - cron: "0 3 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -44,7 +44,7 @@ jobs:
           path: |
             container.tar
             image-id.txt
-          key: v5-${{ steps.date.outputs.date }}-${{ hashFiles('Dockerfile', 'src/**/*.py', 'Dockerfile.in', 'Dockerfile.env', 'pyproject.toml') }}
+          key: v5-${{ steps.date.outputs.date }}-${{ hashFiles('Dockerfile', 'Dockerfile.in', 'Dockerfile.env', 'pyproject.toml', 'src/src/**/*.py', 'src/src/helpers/**/*') }}
 
   run-large-tests:
     name: Run large tests (group ${{ matrix.group }})
@@ -68,6 +68,9 @@ jobs:
       - name: Install dependencies
         run: uv venv && uv pip install -e ".[dev]"
 
+      - name: Install system dependencies
+        run: sudo apt-get update -y && sudo apt-get install -y git-lfs libxml2-utils podman
+
       - name: Restore container image
         id: cache-container-image
         uses: actions/cache/restore@v4
@@ -76,7 +79,7 @@ jobs:
             container.tar
             image-id.txt
           fail-on-cache-miss: true
-          key: v5-${{ needs.build-container-image.outputs.date }}-${{ hashFiles('Dockerfile', 'src/**/*.py', 'Dockerfile.in', 'Dockerfile.env', 'pyproject.toml') }}
+          key: v5-${{ needs.build-container-image.outputs.date }}-${{ hashFiles('Dockerfile', 'Dockerfile.in', 'Dockerfile.env', 'pyproject.toml', 'src/src/**/*.py', 'src/src/helpers/**/*') }}
 
       - name: Load local image for tests
         run: |
@@ -85,10 +88,12 @@ jobs:
 
       - name: Run large tests
         continue-on-error: true
+        env:
+          LARGE_TEST_REPO_DIR: ${{ github.workspace }}/test_docs_large
+          TEST_GROUP_COUNT: 20
+          TEST_GROUP: ${{ matrix.group }}
         run: |
-          export TEST_GROUP_COUNT=20
-          export TEST_GROUP=${{ matrix.group }}
-          uv run make test
+          uv run make large-tests
 
       - name: Upload results
         uses: actions/upload-artifact@v4
@@ -115,6 +120,9 @@ jobs:
 
       - name: Install dependencies
         run: uv venv && uv pip install -e ".[dev]"
+
+      - name: Install system dependencies
+        run: sudo apt-get update -y && sudo apt-get install -y git-lfs libxml2-utils
 
       - name: Download all results
         uses: actions/download-artifact@v4
