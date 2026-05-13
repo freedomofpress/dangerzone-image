@@ -6,7 +6,7 @@ from typing import List
 
 import pytest
 
-from .conftest import get_runtime_security_args
+from .conftest import get_runtime_security_args, run_container_conversion
 
 if not os.environ.get("DZ_RUN_LARGE_TESTS"):
     pytest.skip(
@@ -63,24 +63,8 @@ class TestLargeSet:
     def run_doc_test(self, doc: Path) -> None:
         image = (TESTS_SHARE_DIR / "image-id.txt").read_text().strip()
         security_args = get_runtime_security_args()
-        in_bytes = doc.read_bytes()
         try:
-            proc = subprocess.run(
-                [
-                    "podman",
-                    "run",
-                    "--rm",
-                    "-i",
-                    *security_args,
-                    image,
-                    "/usr/bin/python3",
-                    "-m",
-                    "dangerzone_insecure_converter.doc_to_pixels",
-                ],
-                input=in_bytes,
-                capture_output=True,
-                timeout=5 * 60,
-            )
+            proc = run_container_conversion(doc, image, security_args)
         except subprocess.TimeoutExpired:
             print(f"*** TIMEOUT EXCEEDED FOR DOCUMENT '{doc}' ***")
             raise
