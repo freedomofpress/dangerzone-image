@@ -1,4 +1,3 @@
-import os
 import subprocess
 import sys
 import zipfile
@@ -17,7 +16,7 @@ IMAGE_ID_FILE = REPO_ROOT / "image-id.txt"
 
 TESTS_DIRECTORY = Path(__file__).parent
 SAFE_EXTENSION = "-safe.pdf"
-TEST_DOCS_DIRECTORY = Path(os.environ.get("TEST_DOCS_DIR", str(TESTS_DIRECTORY / "test_docs")))
+TEST_DOCS_DIRECTORY = TESTS_DIRECTORY / "test_docs"
 
 _DANGERZONE_SHARE_DIR = Path(__file__).parent / "share"
 
