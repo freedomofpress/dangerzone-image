@@ -24,10 +24,13 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
       - name: Build container image
         run: |
-          python3 build-image.py \
+          uv run image build \
             --debian-archive-date $(date "+%Y%m%d") \
             --runtime docker
           docker load -i container.tar
