@@ -9,6 +9,16 @@ ignore:
   # SQLite-related features, so we are not affected.
   - package:
       name: libsqlite3-0
+
+  # CVE-2026-33845, and other gnutls CVEs
+  # ======================================
+  # Verdict: gnutls is used for TLS connections, but the container image is
+  # airgapped, and therefore TLS is not used.
+  - package:
+      name: gnutls28
+  - package:
+      name: libgnutls30t64
+
   # CVE-2023-45853
   # ==============
   #
@@ -202,12 +212,3 @@ ignore:
   #
   # [1]: https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0009
   - vulnerability: CVE-2026-5450
-
-  # CVE-2026-33845
-  # ==============
-  #
-  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-33845
-  #
-  # Verdict: Dangerzone is not affected because it doesn't make any network
-  # connections, and therefore DTLS is not used.
-  - vulnerability: CVE-2026-33845
