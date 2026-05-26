@@ -266,6 +266,7 @@ jobs:
           source_date_epoch: ${{ needs.merge.outputs.source_date_epoch }}
           build-args: DEBIAN_ARCHIVE_DATE=${{ needs.merge.outputs.debian_archive_date }}
           buildkit_image: moby/buildkit:latest
+          annotations: rocks.dangerzone.debian_archive_date=${{ needs.merge.outputs.debian_archive_date }}
 
   sign:
     if: ${{ inputs.sign }}
