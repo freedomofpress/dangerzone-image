@@ -177,33 +177,3 @@ def pytest_configure(config: pytest.Config) -> None:
         build_image()
     if not config.getoption("--local"):
         assert determine_container_image(config) is not None
-
-
-def run_container_conversion(
-    doc: Path,
-    container_image: str,
-    container_security_args: List[str],
-    timeout: int = 5 * 60,
-) -> subprocess.CompletedProcess:
-    """Run a document through the container conversion pipeline.
-
-    Returns a CompletedProcess with stdout/stderr from the podman invocation.
-    Raises TimeoutExpired if the conversion exceeds the timeout.
-    """
-    in_bytes = doc.read_bytes()
-    return subprocess.run(
-        [
-            "podman",
-            "run",
-            "--rm",
-            "-i",
-            *container_security_args,
-            container_image,
-            "/usr/bin/python3",
-            "-m",
-            "dangerzone.conversion.doc_to_pixels",
-        ],
-        input=in_bytes,
-        capture_output=True,
-        timeout=timeout,
-    )

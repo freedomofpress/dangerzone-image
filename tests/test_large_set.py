@@ -1,12 +1,12 @@
+import asyncio
 import os
 import re
-import subprocess
 from pathlib import Path
 from typing import List
 
 import pytest
 
-from .conftest import get_runtime_security_args, run_container_conversion
+from .test_convert import run_container_conversion
 
 if not os.environ.get("DZ_RUN_LARGE_TESTS"):
     pytest.skip(
@@ -21,10 +21,11 @@ LARGE_TEST_REPO_DIR = Path(
     )
 )
 TEST_DOCS_DIR = LARGE_TEST_REPO_DIR / "all_documents"
-TESTS_SHARE_DIR = Path(__file__).parent / "share"
 
 SAFE_EXTENSION = "-safe.pdf"
 FORMATS_REGEX = r".*\.(pdf|docx|doc|xlsx|xls|pptx|ppt|odt|ods|odp|odg|jpg|jpeg|gif|png)$"
+
+TIMEOUT = 300  # 5 minutes per document
 
 
 def get_test_docs(min_size: int, max_size: int) -> List[Path]:
@@ -60,31 +61,54 @@ for_each_100M_doc = pytest.mark.parametrize(
 
 
 class TestLargeSet:
-    def run_doc_test(self, doc: Path) -> None:
-        image = (TESTS_SHARE_DIR / "image-id.txt").read_text().strip()
-        security_args = get_runtime_security_args()
+    async def run_doc_test(
+        self, doc: Path, container_image: str, container_security_args: List[str]
+    ) -> None:
         try:
-            proc = run_container_conversion(doc, image, security_args)
-        except subprocess.TimeoutExpired:
+            returncode, _stdout, stderr = await asyncio.wait_for(
+                run_container_conversion(doc, container_image, container_security_args),
+                timeout=TIMEOUT,
+            )
+        except asyncio.TimeoutError:
             print(f"*** TIMEOUT EXCEEDED FOR DOCUMENT '{doc}' ***")
             raise
-        assert proc.returncode == 0, (
-            f"Failed to convert {doc} (exit {proc.returncode}).\n"
-            f"stderr: {proc.stderr.decode(errors='replace')}"
+        assert returncode == 0, (
+            f"Failed to convert {doc} (exit {returncode}).\n"
+            f"stderr: {stderr.decode(errors='replace')}"
         )
 
     @for_each_10K_doc
-    def test_10K_docs(self, doc: Path) -> None:
-        self.run_doc_test(doc)
+    @pytest.mark.asyncio
+    async def test_10K_docs(
+        self, request: pytest.FixtureRequest, doc: Path
+    ) -> None:
+        container_image = request.getfixturevalue("container_image")
+        container_security_args = request.getfixturevalue("container_security_args")
+        await self.run_doc_test(doc, container_image, container_security_args)
 
     @for_each_100K_doc
-    def test_100K_docs(self, doc: Path) -> None:
-        self.run_doc_test(doc)
+    @pytest.mark.asyncio
+    async def test_100K_docs(
+        self, request: pytest.FixtureRequest, doc: Path
+    ) -> None:
+        container_image = request.getfixturevalue("container_image")
+        container_security_args = request.getfixturevalue("container_security_args")
+        await self.run_doc_test(doc, container_image, container_security_args)
 
     @for_each_10M_doc
-    def test_10M_docs(self, doc: Path) -> None:
-        self.run_doc_test(doc)
+    @pytest.mark.asyncio
+    async def test_10M_docs(
+        self, request: pytest.FixtureRequest, doc: Path
+    ) -> None:
+        container_image = request.getfixturevalue("container_image")
+        container_security_args = request.getfixturevalue("container_security_args")
+        await self.run_doc_test(doc, container_image, container_security_args)
 
     @for_each_100M_doc
-    def test_100M_docs(self, doc: Path) -> None:
-        self.run_doc_test(doc)
+    @pytest.mark.asyncio
+    async def test_100M_docs(
+        self, request: pytest.FixtureRequest, doc: Path
+    ) -> None:
+        container_image = request.getfixturevalue("container_image")
+        container_security_args = request.getfixturevalue("container_security_args")
+        await self.run_doc_test(doc, container_image, container_security_args)
