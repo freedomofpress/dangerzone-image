@@ -76,9 +76,13 @@ def write_reference_data(path: Path, data: bytes) -> None:
 
 
 async def read_bounded(sr: asyncio.StreamReader, limit: int) -> bytes:
-    buf = await sr.read(limit)
-    if len(buf) == limit:
-        raise RuntimeError(f"Stream reached maximum size ({limit} bytes)")
+    buf = b""
+    while not sr.at_eof():
+        read = await sr.read(limit)
+        buf += read
+        limit = limit - len(read)
+        if limit <= 0:
+            raise RuntimeError(f"Stream reached maximum size ({limit} bytes)")
     return buf
 
 
