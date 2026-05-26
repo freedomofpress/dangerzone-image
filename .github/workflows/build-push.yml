@@ -265,6 +265,7 @@ jobs:
           runtime: docker
           source_date_epoch: ${{ needs.merge.outputs.source_date_epoch }}
           build-args: DEBIAN_ARCHIVE_DATE=${{ needs.merge.outputs.debian_archive_date }}
+          buildkit_image: moby/buildkit:latest
 
   sign:
     if: ${{ inputs.sign }}
