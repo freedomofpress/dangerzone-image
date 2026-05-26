@@ -1,5 +1,4 @@
 import subprocess
-import sys
 import zipfile
 from pathlib import Path
 from typing import List
@@ -104,39 +103,24 @@ def get_runtime_security_args() -> List[str]:
     return security_args
 
 
-def build_image() -> None:
-    """Invoke the image.py script and load the resulting tarball into podman"""
-    subprocess.run(
-        [sys.executable, str(BUILD_IMAGE_SCRIPT), "build"],
-        check=True,
-        cwd=REPO_ROOT,
-    )
-    if not IMAGE_ID_FILE.exists():
-        raise pytest.UsageError(
-            f"image.py did not produce {IMAGE_ID_FILE}. Build may have failed silently."
-        )
-    tarball = REPO_ROOT / "container.tar"
-    if not tarball.exists():
-        raise pytest.UsageError(f"image.py did not produce {tarball}.")
-    subprocess.run(
-        ["podman", "load", "-i", str(tarball)],
-        check=True,
-        cwd=REPO_ROOT,
-    )
-
-
-@pytest.fixture
-def container_image(request: pytest.FixtureRequest) -> str:
-    """Return the container image to use for container conversion tests."""
-    image = request.config.getoption("--container-image")
-    if not image and IMAGE_ID_FILE.exists():
-        image = IMAGE_ID_FILE.read_text().strip()
+def determine_container_image(config: pytest.Config):
+    image = config.getoption("--container-image")
+    if not image:
+        image_id_txt = _DANGERZONE_SHARE_DIR / "image-id.txt"
+        if image_id_txt.exists():
+            image = image_id_txt.read_text().strip()
     if not image:
         raise pytest.UsageError(
             "No container image available. Provide --container-image, run with "
             "--build, or use --local."
         )
     return image
+
+
+@pytest.fixture
+def container_image(request: pytest.FixtureRequest) -> str:
+    """Return the container image to use for container conversion tests."""
+    return determine_container_image(request.config)
 
 
 @pytest.fixture
@@ -192,11 +176,7 @@ def pytest_configure(config: pytest.Config) -> None:
     if config.getoption("--build"):
         build_image()
     if not config.getoption("--local"):
-        if not config.getoption("--container-image") and not IMAGE_ID_FILE.exists():
-            raise pytest.UsageError(
-                "No container image available. Provide --container-image, run "
-                "with --build, or use --local."
-            )
+        assert determine_container_image(config) is not None
 
 
 def run_container_conversion(
