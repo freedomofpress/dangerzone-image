@@ -212,3 +212,16 @@ ignore:
   #
   # [1]: https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=advisories/GLIBC-SA-2026-0009
   - vulnerability: CVE-2026-5450
+
+  # CVE-2026-7210
+  # ==============
+  #
+  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-7210
+  #
+  # xml.parsers.expat and xml.etree.ElementTree use insufficient entropy for
+  # Expat hash-flooding protection, allowing crafted XML to trigger hash
+  # flooding. Dangerzone is not affected because it does not parse untrusted XML
+  # documents using the Python XML modules during document conversion; document
+  # conversion is handled by LibreOffice. The Debian security team also classifies
+  # this as a minor issue (no-dsa).
+  - vulnerability: CVE-2026-7210
