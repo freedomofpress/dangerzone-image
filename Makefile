@@ -8,7 +8,7 @@ TEST_GROUP ?= 1
 TEST_GROUP_RANDOM_SEED ?= 999999999
 RESULTS_DIR ?= tests/results
 
-.PHONY: lint ruff ty fix large-tests-requirements large-tests-init large-tests
+.PHONY: lint ruff ty fix large-tests-list large-tests-requirements large-tests-init large-tests
 
 lint: ruff ty
 
@@ -23,6 +23,16 @@ fix:
 
 $(RESULTS_DIR):
 	mkdir -p $(RESULTS_DIR)
+
+large-tests-list:
+	@echo "=== Test cases in group $(TEST_GROUP) of $(TEST_GROUP_COUNT) ==="
+	DZ_RUN_LARGE_TESTS=1 uv run pytest \
+		--collect-only \
+		--quiet \
+		--test-group-count=$(TEST_GROUP_COUNT) \
+		--test-group=$(TEST_GROUP) \
+		--test-group-random-seed=$(TEST_GROUP_RANDOM_SEED) \
+		tests/test_large_set.py::TestLargeSet
 
 large-tests-requirements:
 	@git-lfs --version || (echo "ERROR: you need to install 'git-lfs'" && false)

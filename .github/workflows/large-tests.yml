@@ -86,6 +86,14 @@ jobs:
           podman load -i container.tar
           cp image-id.txt tests/share/image-id.txt
 
+      - name: List large tests for group
+        env:
+          LARGE_TEST_REPO_DIR: ${{ github.workspace }}/test_docs_large
+          TEST_GROUP_COUNT: 20
+          TEST_GROUP: ${{ matrix.group }}
+        run: |
+          uv run make large-tests-list
+
       - name: Run large tests
         continue-on-error: true
         env:
