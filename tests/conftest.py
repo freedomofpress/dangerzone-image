@@ -99,18 +99,24 @@ def get_runtime_security_args() -> List[str]:
     return security_args
 
 
-@pytest.fixture
-def container_image(request: pytest.FixtureRequest) -> str:
-    """Return the container image to use for container conversion tests."""
-    image = (_DANGERZONE_SHARE_DIR / "image-id.txt").read_text().strip()
+def determine_container_image(config: pytest.Config):
+    image = config.getoption("--container-image")
     if not image:
-        image = request.config.getoption("--container-image")
+        image_id_txt = _DANGERZONE_SHARE_DIR / "image-id.txt"
+        if image_id_txt.exists():
+            image = image_id_txt.read_text().strip()
     if not image:
         raise pytest.UsageError(
             "No container image available. Provide --container-image or populate "
             "tests/share/image-id.txt, or use --local."
         )
     return image
+
+
+@pytest.fixture
+def container_image(request: pytest.FixtureRequest) -> str:
+    """Return the container image to use for container conversion tests."""
+    return determine_container_image(request.config)
 
 
 @pytest.fixture
@@ -152,12 +158,7 @@ def pytest_configure(config: pytest.Config) -> None:
             "--local."
         )
     if not config.getoption("--local"):
-        image = (_DANGERZONE_SHARE_DIR / "image-id.txt").read_text().strip()
-        if not image and not config.getoption("--container-image"):
-            raise pytest.UsageError(
-                "No container image available. Provide --container-image or populate "
-                "tests/share/image-id.txt, or use --local."
-            )
+        assert determine_container_image(config) is not None
 
 
 def run_container_conversion(
