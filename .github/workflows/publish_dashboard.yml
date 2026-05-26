@@ -36,10 +36,15 @@ jobs:
       - name: Install grype
         run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
 
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
       - name: Build container image from main
         run: |
-          python3 build-image.py \
-            --debian-archive-date $(date "+%Y%m%d") \
+          uv run image build \
+            -d $(date "+%Y%m%d") \
             --runtime docker
           docker load -i container.tar
 
