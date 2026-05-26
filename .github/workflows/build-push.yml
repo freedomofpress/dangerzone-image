@@ -114,7 +114,6 @@ jobs:
           buildkit_image: ${{ needs.prepare.outputs.buildkit_image }}
           source_date_epoch: ${{ needs.prepare.outputs.source_date_epoch }}
           push: true
-          provenance: false
           outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image_name }}",push-by-digest=true,push=true,name-canonical=true
           build-args: DEBIAN_ARCHIVE_DATE=${{ needs.prepare.outputs.debian_archive_date }}
           annotations: rocks.dangerzone.debian_archive_date=${{ needs.prepare.outputs.debian_archive_date }}
