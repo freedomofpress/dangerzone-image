@@ -144,29 +144,4 @@ def pytest_configure(config: pytest.Config) -> None:
     if config.getoption("--build") and config.getoption("--container-image"):
         raise pytest.UsageError("--build and --container-image are mutually exclusive.")
     if not config.getoption("--local"):
-        determine_container_image(config)
-
-
-def run_container_conversion(
-    doc: Path,
-    container_image: str,
-    container_security_args: List[str],
-    timeout: int = 5 * 60,
-) -> subprocess.CompletedProcess:
-    in_bytes = doc.read_bytes()
-    return subprocess.run(
-        [
-            "podman",
-            "run",
-            "--rm",
-            "-i",
-            *container_security_args,
-            container_image,
-            "/usr/bin/python3",
-            "-m",
-            "dangerzone.conversion.doc_to_pixels",
-        ],
-        input=in_bytes,
-        capture_output=True,
-        timeout=timeout,
-    )
+        assert determine_container_image(config) is not None
