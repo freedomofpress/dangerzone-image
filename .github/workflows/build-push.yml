@@ -256,7 +256,7 @@ jobs:
           fetch-depth: 0
 
       - name: Reproduce and verify image
-        uses: freedomofpress/repro-build/verify@b4c783c4458bbd0ee430f516e0ed3a60108e61da # 1.0.0
+        uses: freedomofpress/repro-build/verify@e3539de5c53c198f897fe6053ec2662f8f0e9bf3 # 1.1.0
         with:
           target_image: ${{ needs.merge.outputs.image }}@${{ needs.merge.outputs[format('digest_{0}', matrix.platform.arch)] }}
           file: Dockerfile
