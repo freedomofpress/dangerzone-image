@@ -263,9 +263,8 @@ jobs:
           file: Dockerfile
           context: ./src/
           platforms: ${{ matrix.platform.name }}
-          buildkit_image: ${{ needs.prepare.outputs.buildkit_image }}
           runtime: docker
-          source_date_epoch: ${{ needs.prepare.outputs.source_date_epoch }}
+          source_date_epoch: ${{ needs.merge.outputs.source_date_epoch }}
           build-args: DEBIAN_ARCHIVE_DATE=${{ needs.merge.outputs.debian_archive_date }}
 
   sign:
