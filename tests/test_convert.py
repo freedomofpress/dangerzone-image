@@ -9,10 +9,12 @@ import pytest
 from dangerzone_insecure_converter import errors
 from dangerzone_insecure_converter.common import INT_BYTES
 from dangerzone_insecure_converter.doc_to_pixels import DocumentToPixels
+from dangerzone_insecure_converter.errors import MAX_PAGES
 
 from .conftest import TEST_DOCS_DIRECTORY, for_each_doc
 
 TIMEOUT = 180  # 3 minutes
+MAX_STREAM_SIZE = 2 * 1024 * 1024 * 1024  # 2 GiB
 
 REFERENCE_DIR = Path(__file__).parent / "test_docs" / "reference"
 _GZIP_MAGIC = b"\x1f\x8b"
@@ -73,6 +75,26 @@ def write_reference_data(path: Path, data: bytes) -> None:
     path.write_bytes(gzip.compress(data))
 
 
+async def read_bounded(sr: asyncio.StreamReader, limit: int) -> bytes:
+    buf = await sr.read(limit)
+    if len(buf) == limit:
+        raise RuntimeError(f"Stream reached maximum size ({limit} bytes)")
+    return buf
+
+
+async def read_stdout_bounded(proc: asyncio.subprocess.Process) -> bytes:
+    header = await proc.stdout.readexactly(INT_BYTES)
+    page_count = int.from_bytes(header, "big", signed=False)
+    if page_count >= MAX_PAGES:
+        raise ValueError(f"Page count {page_count} exceeds maximum ({MAX_PAGES})")
+    rest = await read_bounded(proc.stdout, MAX_STREAM_SIZE)
+    return header + rest
+
+
+async def read_stderr_bounded(proc: asyncio.subprocess.Process) -> bytes:
+    return await read_bounded(proc.stderr, MAX_STREAM_SIZE)
+
+
 async def run_local_conversion(doc: Path) -> tuple[bytes, List[str]]:
     input_file = Path("/tmp/input_file")
     try:
@@ -103,7 +125,26 @@ async def run_container_conversion(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await proc.communicate(input=doc.read_bytes())
+
+    assert proc.stdin is not None
+    proc.stdin.write(doc.read_bytes())
+    await proc.stdin.drain()
+    proc.stdin.close()
+
+    assert proc.stdout is not None
+    assert proc.stderr is not None
+
+    stdout_task = asyncio.create_task(read_stdout_bounded(proc))
+    stderr_task = asyncio.create_task(read_stderr_bounded(proc))
+
+    # NOTE: Use asyncio.gather here, so that any exception from the above
+    # awaitables will cancel the whole group. This way, a parsing error while
+    # reading stdout can cancel the `proc.wait()`, which would otherwise remain
+    # blocked, even if we attempted to kill the process. We have seen at least
+    # one case where the Podman process is killed but `conmon` remains blocked,
+    # and therefore the `.wait()` method hangs.
+    _, stdout, stderr = await asyncio.gather(proc.wait(), stdout_task, stderr_task)
+
     assert proc.returncode is not None
     return proc.returncode, stdout, stderr
 
@@ -178,9 +219,7 @@ async def test_bad_pdf(
     if request.config.getoption("--local"):
         try:
             with pytest.raises(expected_error):
-                await asyncio.wait_for(
-                    run_local_conversion(bad_doc), timeout=TIMEOUT
-                )
+                await asyncio.wait_for(run_local_conversion(bad_doc), timeout=TIMEOUT)
         except TimeoutError:
             pytest.fail("timeout failed")
     else:
