@@ -27,11 +27,10 @@ Dockerfile: Dockerfile.env Dockerfile.in ## Regenerate the Dockerfile from its t
 $(RESULTS_DIR):
 	mkdir -p $(RESULTS_DIR)
 
-large-tests-list:
+large-tests-list: large-tests-init
 	@echo "=== Test cases in group $(TEST_GROUP) of $(TEST_GROUP_COUNT) ==="
 	DZ_RUN_LARGE_TESTS=1 uv run pytest \
 		--collect-only \
-		--quiet \
 		--test-group-count=$(TEST_GROUP_COUNT) \
 		--test-group=$(TEST_GROUP) \
 		--test-group-random-seed=$(TEST_GROUP_RANDOM_SEED) \
