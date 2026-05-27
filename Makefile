@@ -1,4 +1,4 @@
-LARGE_TEST_REPO_DIR ?= tests/test_docs_large
+LARGE_TEST_REPO_DIR ?= tests/test_docs_large/
 
 GIT_DESC := $(shell git describe --always 2>/dev/null || echo "unknown")
 
@@ -6,7 +6,7 @@ JUNIT_FLAGS := --capture=sys -o junit_logging=all
 TEST_GROUP_COUNT ?= 1
 TEST_GROUP ?= 1
 TEST_GROUP_RANDOM_SEED ?= 999999999
-RESULTS_DIR ?= tests/results
+RESULTS_DIR ?= tests/results/
 
 .PHONY: lint ruff ty fix large-tests-list large-tests-requirements large-tests
 
@@ -25,8 +25,10 @@ $(RESULTS_DIR):
 	mkdir -p $(RESULTS_DIR)
 
 $(LARGE_TEST_REPO_DIR): large-tests-requirements
-	git clone --depth 1 https://github.com/freedomofpress/dangerzone-test-set.git $(LARGE_TEST_REPO_DIR)
-	cd $(LARGE_TEST_REPO_DIR) && git lfs pull
+	@if [ ! -d "$(LARGE_TEST_REPO_DIR)" ]; then \
+		git clone --depth 1 https://github.com/freedomofpress/dangerzone-test-set.git $(LARGE_TEST_REPO_DIR); \
+	fi
+	git -C $(LARGE_TEST_REPO_DIR) lfs pull
 
 large-tests-list: $(LARGE_TEST_REPO_DIR)
 	@echo "=== Test cases in group $(TEST_GROUP) of $(TEST_GROUP_COUNT) ==="
