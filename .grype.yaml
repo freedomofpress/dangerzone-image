@@ -19,6 +19,63 @@ ignore:
   - package:
       name: libgnutls30t64
 
+  # CVE-2026-42496, and other perl-base CVEs
+  # ========================================
+  # Verdict: Vulnerabilities in the perl-base package cannot be used to achieve
+  # RCE, by a malicious file sanitized in a Dangerzone container. Therefore, we
+  # can ignore them as a whole.
+  #
+  # Explanation: The perl-base package is part of the "essential" packages of
+  # Debian, meaning that packages can assume it's always installed in the
+  # system, and thus can't be removed from the installation without breaking it.
+  # In practice though, in our Debian Trixie container image, we are aware of
+  # the following usages of the perl-base package:
+  #
+  # 1. The APT package manager.
+  # 2. The UCF package [1], which in turn is a dependency of the LibreOffice
+  #    packages [2].
+  #
+  # In case of (1), the malicious file cannot interact with the APT commands,
+  # unless it has already achieved RCE. In case of (2), the UCF package deals
+  # only with user configuration files, which means that LibreOffice does not
+  # use Perl to parse user-provided files.
+  #
+  # With this in mind, and because we can't remove perl-base, we can safely
+  # ignore the perl-base CVEs.
+  #
+  # [1]: https://manpages.debian.org/trixie/ucf/ucf.1.en.html
+  # [2]: This is the dependency chain of perl-base that reaches up to
+  #      LibreOffice, as of 2026-06-03 on Debian Trixie:
+  #
+  #        root@c647757550fe:/# apt-cache rdepends perl-base
+  #        perl-base
+  #        Reverse Depends:
+  #          libtext-charwidth-perl
+  #
+  #        root@c647757550fe:/# apt-cache rdepends libtext-charwidth-perl
+  #        libtext-charwidth-perl
+  #        Reverse Depends:
+  #          libtext-wrapi18n-perl
+  #
+  #        root@c647757550fe:/# apt-cache rdepends libtext-wrapi18n-perl
+  #        libtext-wrapi18n-perl
+  #        Reverse Depends:
+  #          ucf
+  #
+  #        root@c647757550fe:/# apt-cache rdepends ucf
+  #        ucf
+  #        Reverse Depends:
+  #          libreoffice-base-nogui
+  #          python3-uno
+  #          libreoffice-writer-nogui
+  #          libreoffice-math-nogui
+  #          libreoffice-impress-nogui
+  #          libreoffice-draw-nogui
+  #          libreoffice-common
+  #          libreoffice-calc-nogui
+  - package:
+      name: perl-base
+
   # CVE-2023-45853
   # ==============
   #
