@@ -13,7 +13,7 @@ from dangerzone_insecure_converter.errors import MAX_PAGES
 
 from .conftest import TEST_DOCS_DIRECTORY, for_each_doc
 
-TIMEOUT = 180  # 3 minutes
+TIMEOUT = 30
 MAX_STREAM_SIZE = 2 * 1024 * 1024 * 1024  # 2 GiB
 
 REFERENCE_DIR = Path(__file__).parent / "test_docs" / "reference"
