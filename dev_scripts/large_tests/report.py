@@ -2,27 +2,51 @@
 
 import re
 import sys
+import xml.etree.ElementTree as ET
 from collections import Counter
+from pathlib import Path
 from typing import Dict, List, Tuple
 
-import xml.etree.ElementTree as ET
+DOC_TO_PIXELS_LOG_START = "----- DOC TO PIXELS LOG START -----"
+DOC_TO_PIXELS_LOG_END = "----- DOC TO PIXELS LOG END -----"
+
+EXPECTED_PATTERNS = [
+    re.compile(r"^Converting page X/X to pixels$"),
+    re.compile(r"^Converting page X/X from pixels to searchable PDF$"),
+    re.compile(r"^Converting to PDF using LibreOffice$"),
+    re.compile(r"^Converted document to pixels$"),
+    re.compile(r"^Safe PDF created$"),
+    re.compile(r"^Compressing PDF$"),
+    re.compile(r"^Merging X pages into a single PDF$"),
+    re.compile(r"^Calculating number of pages$"),
+    re.compile(r"^\[COMMAND\].*$"),
+    re.compile(r"^Result: (SUCCESS|FAILURE)$"),
+    re.compile(r"^pdfinfo:$"),
+    re.compile(r"^pdftoppm: Syntax Error.*$"),
+    re.compile(r"^convert /tmp/input_file as a .*$"),
+    re.compile(r"^time=.*msg=\"forwarding signal.*"),
+    re.compile(r"^time=.*msg=\"Waiting for container.*"),
+    re.compile(r"^Installing LibreOffice extension.*$"),
+    re.compile(r"^Archive:.*$"),
+    re.compile(r"^ extracting:.*$"),
+    re.compile(r"^  inflating:.*$"),
+    re.compile(r"^$"),
+]
 
 
-# Pattern to scrub variable data (dates, hex IDs, numbers) for grouping
-VARIABLE_PATTERN = re.compile(
-    r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?\b"
-    r"|\b[0-9a-f]{8,}\b"
-    r"|\b\d{4}/\d{2}/\d{2}\b"
-    r"|\b\d{2}:\d{2}:\d{2}\b"
-    r'|(?<=file\s)\S+\.pdf'
-    r"|\bpage\s+\d+"
-    r"|\bpages\s+\d+"
-)
+def scrub_container_line(line: str) -> str:
+    line = re.sub(r"\b[0-9a-fA-F]{6,}\b", "X", line)
+    line = re.sub(r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "X", line)
+    line = re.sub(r"\d+", "X", line)
+    return line
 
 
-def scrub_text(text: str) -> str:
-    """Replace variable data with placeholders for better grouping."""
-    return VARIABLE_PATTERN.sub("X", text)
+def is_expected_line(line: str) -> bool:
+    return any(p.match(line) for p in EXPECTED_PATTERNS)
+
+
+def is_blank_line(line: str) -> bool:
+    return line == ""
 
 
 def parse_junit(xml_file: str) -> ET.Element:
@@ -31,52 +55,99 @@ def parse_junit(xml_file: str) -> ET.Element:
 
 
 def count_results(root: ET.Element) -> Dict[str, int]:
-    testsuite = root.find("testsuite")
-    if testsuite is None:
-        return {"errors": 0, "failures": 0, "skipped": 0, "tests": 0}
+    total_errors = 0
+    total_failures = 0
+    total_skipped = 0
+    total_tests = 0
+    for testsuite in root.findall("testsuite"):
+        total_errors += int(testsuite.attrib.get("errors", "0"))
+        total_failures += int(testsuite.attrib.get("failures", "0"))
+        total_skipped += int(testsuite.attrib.get("skipped", "0"))
+        total_tests += int(testsuite.attrib.get("tests", "0"))
     return {
-        "errors": int(testsuite.attrib.get("errors", "0")),
-        "failures": int(testsuite.attrib.get("failures", "0")),
-        "skipped": int(testsuite.attrib.get("skipped", "0")),
-        "tests": int(testsuite.attrib.get("tests", "0")),
+        "errors": total_errors,
+        "failures": total_failures,
+        "skipped": total_skipped,
+        "tests": total_tests,
     }
 
 
-def get_test_overview(root: ET.Element) -> List[Tuple[str, str]]:
-    testsuite = root.find("testsuite")
-    results = []
-    if testsuite is not None:
-        for testcase in testsuite.findall("testcase"):
-            name = testcase.attrib.get("name", "unknown")
-            classname = testcase.attrib.get("classname", "")
-            full_name = f"{classname}::{name}" if classname else name
-            failure = testcase.find("failure")
-            error = testcase.find("error")
-            if failure is not None:
-                status = "FAIL"
-            elif error is not None:
-                status = "ERROR"
-            else:
-                status = "PASS"
-            results.append((full_name, status))
-    return results
+def get_test_cases(root: ET.Element) -> List[ET.Element]:
+    cases = []
+    for testsuite in root.findall("testsuite"):
+        cases.extend(testsuite.findall("testcase"))
+    return cases
 
 
-def get_container_outputs(root: ET.Element) -> List[str]:
-    outputs = []
-    testsuite = root.find("testsuite")
-    if testsuite is not None:
-        for testcase in testsuite.findall("testcase"):
-            for child in ("failure", "error"):
-                elem = testcase.find(child)
-                if elem is not None and elem.text:
-                    outputs.append(scrub_text(elem.text.strip()))
-    return outputs
+def get_test_status(testcase: ET.Element) -> str:
+    if testcase.find("failure") is not None:
+        return "FAIL"
+    elif testcase.find("error") is not None:
+        return "ERROR"
+    return "PASS"
+
+
+def get_extension(name: str) -> str:
+    m = re.search(r"\[([^\]]+)\]", name)
+    if m:
+        ext = Path(m.group(1)).suffix.lstrip(".")
+        return ext if ext else "none"
+    return "none"
+
+
+def get_size_bucket(name: str) -> str:
+    if "10K_docs" in name:
+        return "0KB  -  10KB"
+    elif "100K_docs" in name:
+        return "10KB - 100KB"
+    elif "10M_docs" in name:
+        return "100KB - 10MB"
+    elif "100M_docs" in name:
+        return "10MB - 100MB"
+    return "unknown"
+
+
+def extract_captured_text(testcase: ET.Element, tag: str) -> str:
+    elem = testcase.find(tag)
+    if elem is not None and elem.text:
+        text = elem.text
+        lines = text.split("\n")
+        content_lines = []
+        in_content = False
+        for line in lines:
+            if "Captured" in line and "---" in line:
+                in_content = True
+                continue
+            if in_content:
+                content_lines.append(line)
+        if content_lines:
+            return "\n".join(content_lines)
+    return ""
+
+
+def extract_container_output(testcase: ET.Element) -> str:
+    output = extract_captured_text(testcase, "system-out")
+    if DOC_TO_PIXELS_LOG_START in output and DOC_TO_PIXELS_LOG_END in output:
+        (_, rest) = output.split(DOC_TO_PIXELS_LOG_START, 1)
+        (log, _) = rest.split(DOC_TO_PIXELS_LOG_END, 1)
+        return log.strip()
+    elif output:
+        return output.strip()
+    return ""
+
+
+def get_container_lines(testcase: ET.Element) -> List[str]:
+    output = extract_container_output(testcase)
+    if output:
+        return [line.rstrip() for line in output.split("\n")]
+    return []
 
 
 def generate_report(xml_file: str) -> str:
     root = parse_junit(xml_file)
     results = count_results(root)
+    test_cases = get_test_cases(root)
+
     total = results["tests"]
     failures = results["failures"]
     errors = results["errors"]
@@ -87,31 +158,43 @@ def generate_report(xml_file: str) -> str:
     lines.append("==== RESULTS SUMMARY ===")
     lines.append(f"    errors: {errors}")
     lines.append(f"    failures: {failures}")
+    lines.append(f"    successes: {total - errors - failures - skipped}")
     lines.append(f"    skipped: {skipped}")
     lines.append(f"    tests: {total}")
     lines.append(f"    failure rate: {failure_rate}")
     lines.append("")
     lines.append("")
 
-    # Test overview
-    overview = get_test_overview(root)
-    pass_count = sum(1 for _, s in overview if s == "PASS")
-    fail_count = sum(1 for _, s in overview if s in ("FAIL", "ERROR"))
+    ext_counter = Counter()
+    size_counter: Dict[str, int] = {}
+    for tc in test_cases:
+        name = tc.attrib.get("name", "")
+        ext = get_extension(name)
+        size_bucket = get_size_bucket(name)
+        ext_counter[ext] += 1
+        size_counter[size_bucket] = size_counter.get(size_bucket, 0) + 1
+
     lines.append("=== TEST OVERVIEW ===")
-    lines.append(f"  Total: {len(overview)}  Passed: {pass_count}  Failed: {fail_count}")
-    if fail_count > 0:
-        lines.append("")
-        lines.append("  Failures:")
-        for name, status in overview:
-            if status in ("FAIL", "ERROR"):
-                lines.append(f"    [{status}] {name}")
+    lines.append("")
+    lines.append("  Extensions breakdown (All available tests)")
+    for ext, count in ext_counter.most_common():
+        lines.append(f"    {count:>8} {ext}")
+    lines.append("")
+    lines.append("  File sizes breakdown (All available tests)")
+    for bucket in ["0KB  -  10KB", "10KB - 100KB", "100KB - 10MB", "10MB - 100MB"]:
+        count = size_counter.get(bucket, 0)
+        lines.append(f"    {bucket} {count}")
     lines.append("")
     lines.append("")
 
-    # Most common container output
-    outputs = get_container_outputs(root)
-    if outputs:
-        counter = Counter(outputs)
+    all_lines: List[str] = []
+    for tc in test_cases:
+        all_lines.extend(get_container_lines(tc))
+
+    if all_lines:
+        scrubbed = [scrub_container_line(line) for line in all_lines]
+        filtered = [l for l in scrubbed if not is_expected_line(l)]
+        counter = Counter(filtered)
         lines.append("=== MOST COMMON CONTAINER OUTPUT ===")
         lines.append("")
         lines.append("  Top 30:")
@@ -120,18 +203,69 @@ def generate_report(xml_file: str) -> str:
         lines.append("")
         lines.append("")
 
-        # Failure reasons
+    fail_lines: List[str] = []
+    for tc in test_cases:
+        if get_test_status(tc) in ("FAIL", "ERROR"):
+            fail_lines.extend(get_container_lines(tc))
+
+    if fail_lines:
+        scrubbed = [scrub_container_line(line) for line in fail_lines]
+        filtered = [l for l in scrubbed if not is_expected_line(l)]
+        counter = Counter(filtered)
         lines.append("=== FAILURE REASONS ===")
         lines.append("")
         lines.append("  All failures:")
         for output, count in counter.most_common():
-            lines.append(f"    {count:>5} {output[:120]}")
+            lines.append(f"    {count:>5} {output}")
+        lines.append("")
+        lines.append("")
 
-    # Timeouts (not directly in JUnit, but useful)
-    lines.append("")
-    lines.append("")
+    timeout_files: List[str] = []
+    for tc in test_cases:
+        output = extract_captured_text(tc, "system-out")
+        if "TIMEOUT EXCEEDED" in output:
+            m = re.search(r"'(.*?)'", output)
+            if m:
+                timeout_files.append(m.group(1))
+
     lines.append("=== TIMEOUTS ===")
-    lines.append("  (Not available from JUnit XML)")
+    lines.append("")
+    if timeout_files:
+        lines.append(f"  Summary: {len(timeout_files)}")
+        lines.append("")
+        lines.append("  Affected files:")
+        for f in timeout_files:
+            lines.append(f"    - {f}")
+    else:
+        lines.append("  Summary: 0")
+        lines.append("")
+        lines.append("  Affected files:")
+    lines.append("")
+    lines.append("")
+
+    failed_entries: List[Tuple[str, List[str]]] = []
+    for tc in test_cases:
+        if get_test_status(tc) in ("FAIL", "ERROR"):
+            name = tc.attrib.get("name", "")
+            m = re.search(r"\[([^\]]+)\]", name)
+            fname = m.group(1) if m else name
+            container_lines = get_container_lines(tc)
+            scrubbed = [scrub_container_line(l) for l in container_lines]
+            filtered = [l for l in scrubbed if not is_expected_line(l)]
+            preview = filtered[:3]
+            failed_entries.append((fname, preview))
+
+    lines.append("=== FAILED FILES ===")
+    lines.append("")
+    if failed_entries:
+        for fname, preview in sorted(failed_entries, key=lambda x: x[0]):
+            lines.append(f"  - {fname}")
+            for pline in preview:
+                lines.append(f"      {pline}")
+    else:
+        lines.append("  (none)")
+    lines.append("")
+    lines.append("")
 
     return "\n".join(lines)
 

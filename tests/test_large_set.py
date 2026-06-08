@@ -72,9 +72,12 @@ class TestLargeSet:
         except asyncio.TimeoutError:
             print(f"*** TIMEOUT EXCEEDED FOR DOCUMENT '{doc}' ***")
             raise
+        stderr_str = stderr.decode(errors="replace")
+        if stderr_str:
+            print(stderr_str, end="")
         assert returncode == 0, (
             f"Failed to convert {doc} (exit {returncode}).\n"
-            f"stderr: {stderr.decode(errors='replace')}"
+            f"stderr: {stderr_str}"
         )
 
     @for_each_10K_doc
