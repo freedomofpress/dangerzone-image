@@ -166,13 +166,15 @@ def generate_report(xml_file: str) -> str:
     lines.append("")
 
     ext_counter = Counter()
-    size_counter: Dict[str, int] = {}
+    size_timing: Dict[str, dict] = {}
     for tc in test_cases:
         name = tc.attrib.get("name", "")
         ext = get_extension(name)
-        size_bucket = get_size_bucket(name)
+        bucket = get_size_bucket(name)
         ext_counter[ext] += 1
-        size_counter[size_bucket] = size_counter.get(size_bucket, 0) + 1
+        d = size_timing.setdefault(bucket, {"count": 0, "total": 0.0})
+        d["count"] += 1
+        d["total"] += float(tc.attrib.get("time", 0))
 
     lines.append("=== TEST OVERVIEW ===")
     lines.append("")
@@ -181,9 +183,19 @@ def generate_report(xml_file: str) -> str:
         lines.append(f"    {count:>8} {ext}")
     lines.append("")
     lines.append("  File sizes breakdown (All available tests)")
+    lines.append(f"    {'Bucket':<15} {'Docs':>6} {'Total':>10} {'Avg':>8}")
+    grand_docs = 0
+    grand_total = 0.0
     for bucket in ["0KB  -  10KB", "10KB - 100KB", "100KB - 10MB", "10MB - 100MB"]:
-        count = size_counter.get(bucket, 0)
-        lines.append(f"    {bucket} {count}")
+        d = size_timing.get(bucket)
+        if d and d["count"]:
+            grand_docs += d["count"]
+            grand_total += d["total"]
+            avg = d["total"] / d["count"]
+            lines.append(f"    {bucket:<15} {d['count']:>6} {d['total']:>8.1f}s {avg:>7.1f}s")
+    if grand_docs:
+        lines.append(f"    {'─' * 31}")
+        lines.append(f"    {'Total':<15} {grand_docs:>6} {grand_total:>8.1f}s {grand_total / grand_docs:>7.1f}s")
     lines.append("")
     lines.append("")
 
