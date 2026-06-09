@@ -23,7 +23,9 @@ LARGE_TEST_REPO_DIR = Path(
 TEST_DOCS_DIR = LARGE_TEST_REPO_DIR / "all_documents"
 
 SAFE_EXTENSION = "-safe.pdf"
-FORMATS_REGEX = r".*\.(pdf|docx|doc|xlsx|xls|pptx|ppt|odt|ods|odp|odg|jpg|jpeg|gif|png)$"
+FORMATS_REGEX = (
+    r".*\.(pdf|docx|doc|xlsx|xls|pptx|ppt|odt|ods|odp|odg|jpg|jpeg|gif|png)$"
+)
 
 TIMEOUT = 120  # 2 minutes per document
 
@@ -76,42 +78,33 @@ class TestLargeSet:
         if stderr_str:
             print(stderr_str, end="")
         assert returncode == 0, (
-            f"Failed to convert {doc} (exit {returncode}).\n"
-            f"stderr: {stderr_str}"
+            f"Failed to convert {doc} (exit {returncode}).\nstderr: {stderr_str}"
         )
 
     @for_each_10K_doc
     @pytest.mark.asyncio
-    async def test_10K_docs(
-        self, request: pytest.FixtureRequest, doc: Path
-    ) -> None:
+    async def test_10K_docs(self, request: pytest.FixtureRequest, doc: Path) -> None:
         container_image = request.getfixturevalue("container_image")
         container_security_args = request.getfixturevalue("container_security_args")
         await self.run_doc_test(doc, container_image, container_security_args)
 
     @for_each_100K_doc
     @pytest.mark.asyncio
-    async def test_100K_docs(
-        self, request: pytest.FixtureRequest, doc: Path
-    ) -> None:
+    async def test_100K_docs(self, request: pytest.FixtureRequest, doc: Path) -> None:
         container_image = request.getfixturevalue("container_image")
         container_security_args = request.getfixturevalue("container_security_args")
         await self.run_doc_test(doc, container_image, container_security_args)
 
     @for_each_10M_doc
     @pytest.mark.asyncio
-    async def test_10M_docs(
-        self, request: pytest.FixtureRequest, doc: Path
-    ) -> None:
+    async def test_10M_docs(self, request: pytest.FixtureRequest, doc: Path) -> None:
         container_image = request.getfixturevalue("container_image")
         container_security_args = request.getfixturevalue("container_security_args")
         await self.run_doc_test(doc, container_image, container_security_args)
 
     @for_each_100M_doc
     @pytest.mark.asyncio
-    async def test_100M_docs(
-        self, request: pytest.FixtureRequest, doc: Path
-    ) -> None:
+    async def test_100M_docs(self, request: pytest.FixtureRequest, doc: Path) -> None:
         container_image = request.getfixturevalue("container_image")
         container_security_args = request.getfixturevalue("container_security_args")
         await self.run_doc_test(doc, container_image, container_security_args)
