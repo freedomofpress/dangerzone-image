@@ -160,13 +160,13 @@ def write_reference_data(path: Path, data: bytes) -> None:
 async def read_and_validate_stdout(
     proc: asyncio.subprocess.Process,
     keep_data: bool = True,
-) -> tuple[bytes | None, int]:
+) -> bytes:
     assert proc.stdout is not None
-
+    sr = proc.stdout
     buf = io.BytesIO()
 
     async def read_exactly(size: int):
-        _bytes = await proc.stdout.readexactly(size)
+        _bytes = await sr.readexactly(size)
         if keep_data:
             buf.write(_bytes)
         return _bytes
@@ -208,11 +208,10 @@ async def run_local_conversion(doc: Path) -> tuple[bytes, List[str]]:
 
 
 async def run_container_conversion(
-    doc: Path,
-    container_image: str,
-    container_security_args: List[str],
+    doc: Path, container_image: str, container_security_args: List[str],
     keep_output: bool = True,
-) -> tuple[int, bytes | None, bytes]:
+    expect_fail: bool = False,
+) -> tuple[int, bytes, bytes]:
     cid_fd, cid_path = tempfile.mkstemp(prefix="dz-cid-")
     os.close(cid_fd)
 
@@ -244,8 +243,7 @@ async def run_container_conversion(
         assert proc.stderr is not None
 
         async def _read_stdout_task():
-            data = await read_and_validate_stdout(proc, keep_data=keep_output)
-            return data
+            return await read_and_validate_stdout(proc, keep_data=keep_output)
 
         stdout_task = asyncio.create_task(_read_stdout_task())
         stderr_task = asyncio.create_task(read_stderr(proc))
@@ -256,7 +254,17 @@ async def run_container_conversion(
         # blocked, even if we attempted to kill the process. We have seen at least
         # one case where the Podman process is killed but `conmon` remains blocked,
         # and therefore the `.wait()` method hangs.
-        _, stdout, stderr = await asyncio.gather(proc.wait(), stdout_task, stderr_task)
+        try:
+            _, stdout, stderr = await asyncio.gather(
+                proc.wait(), stdout_task, stderr_task
+            )
+        except asyncio.exceptions.IncompleteReadError:
+            if expect_fail:
+                stdout = b""
+                stderr = await stderr_task
+                _ = await proc.wait()
+            else:
+                raise
 
         assert proc.returncode is not None
         return proc.returncode, stdout, stderr
@@ -322,7 +330,6 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
             f"stderr: {stderr.decode(errors='replace')}"
         )
 
-        assert pixel_data is not None
         reference_bin = REFERENCE_DIR / f"{doc.stem}.bin"
         if request.config.getoption("--update-pixel-references"):
             REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
@@ -366,7 +373,7 @@ async def test_bad_pdf(
         try:
             returncode, _stdout, stderr = await asyncio.wait_for(
                 run_container_conversion(
-                    bad_doc, container_image, container_security_args
+                    bad_doc, container_image, container_security_args, expect_fail=True
                 ),
                 timeout=TIMEOUT,
             )
