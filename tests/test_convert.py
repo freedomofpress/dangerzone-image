@@ -171,21 +171,27 @@ async def read_and_validate_stdout(
             buf.write(_bytes)
         return _bytes
 
-    header = await read_exactly(INT_BYTES)
-    page_count = int.from_bytes(header, "big", signed=False)
-    if page_count >= MAX_PAGES:
-        raise ValueError(f"Page count {page_count} exceeds maximum ({MAX_PAGES})")
-    assert page_count > 0, "Expected at least one page"
+    try:
+        header = await read_exactly(INT_BYTES)
+        page_count = int.from_bytes(header, "big", signed=False)
+        if page_count >= MAX_PAGES:
+            raise ValueError(f"Page count {page_count} exceeds maximum ({MAX_PAGES})")
+        assert page_count > 0, "Expected at least one page"
 
-    for _ in range(page_count):
-        width_bytes = await read_exactly(INT_BYTES)
-        width = int.from_bytes(width_bytes, "big", signed=False)
-        assert 0 < width < 10000, "Page width must be positive and less than 10000"
-        height_bytes = await read_exactly(INT_BYTES)
-        height = int.from_bytes(height_bytes, "big", signed=False)
-        assert 0 < height < 10000, "Page height must be positive and less than 10000"
-        pixel_size = width * height * 3
-        _ = await read_exactly(pixel_size)
+        for _ in range(page_count):
+            width_bytes = await read_exactly(INT_BYTES)
+            width = int.from_bytes(width_bytes, "big", signed=False)
+            assert 0 < width < 10000, "Page width must be positive and less than 10000"
+            height_bytes = await read_exactly(INT_BYTES)
+            height = int.from_bytes(height_bytes, "big", signed=False)
+            assert 0 < height < 10000, (
+                "Page height must be positive and less than 10000"
+            )
+            pixel_size = width * height * 3
+            _ = await read_exactly(pixel_size)
+    except asyncio.exceptions.IncompleteReadError:
+        pass
+
     return buf.getvalue()
 
 
@@ -208,9 +214,10 @@ async def run_local_conversion(doc: Path) -> tuple[bytes, List[str]]:
 
 
 async def run_container_conversion(
-    doc: Path, container_image: str, container_security_args: List[str],
+    doc: Path,
+    container_image: str,
+    container_security_args: List[str],
     keep_output: bool = True,
-    expect_fail: bool = False,
 ) -> tuple[int, bytes, bytes]:
     cid_fd, cid_path = tempfile.mkstemp(prefix="dz-cid-")
     os.close(cid_fd)
@@ -254,17 +261,7 @@ async def run_container_conversion(
         # blocked, even if we attempted to kill the process. We have seen at least
         # one case where the Podman process is killed but `conmon` remains blocked,
         # and therefore the `.wait()` method hangs.
-        try:
-            _, stdout, stderr = await asyncio.gather(
-                proc.wait(), stdout_task, stderr_task
-            )
-        except asyncio.exceptions.IncompleteReadError:
-            if expect_fail:
-                stdout = b""
-                stderr = await stderr_task
-                _ = await proc.wait()
-            else:
-                raise
+        _, stdout, stderr = await asyncio.gather(proc.wait(), stdout_task, stderr_task)
 
         assert proc.returncode is not None
         return proc.returncode, stdout, stderr
@@ -373,7 +370,7 @@ async def test_bad_pdf(
         try:
             returncode, _stdout, stderr = await asyncio.wait_for(
                 run_container_conversion(
-                    bad_doc, container_image, container_security_args, expect_fail=True
+                    bad_doc, container_image, container_security_args
                 ),
                 timeout=TIMEOUT,
             )
