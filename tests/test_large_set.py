@@ -27,7 +27,7 @@ FORMATS_REGEX = (
     r".*\.(pdf|docx|doc|xlsx|xls|pptx|ppt|odt|ods|odp|odg|jpg|jpeg|gif|png)$"
 )
 
-TIMEOUT = 600  # 10 minutes per document
+TIMEOUT = 30
 
 
 def get_test_docs(min_size: int, max_size: int) -> List[Path]:
