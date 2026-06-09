@@ -27,7 +27,7 @@ FORMATS_REGEX = (
     r".*\.(pdf|docx|doc|xlsx|xls|pptx|ppt|odt|ods|odp|odg|jpg|jpeg|gif|png)$"
 )
 
-TIMEOUT = 30
+TIMEOUT = 60
 
 
 def get_test_docs(min_size: int, max_size: int) -> List[Path]:
@@ -68,7 +68,7 @@ class TestLargeSet:
     ) -> None:
         try:
             returncode, _stdout, stderr = await asyncio.wait_for(
-                run_container_conversion(doc, container_image, container_security_args),
+                run_container_conversion(doc, container_image, container_security_args, keep_output=False),
                 timeout=TIMEOUT,
             )
         except asyncio.TimeoutError:

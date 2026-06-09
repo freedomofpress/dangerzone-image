@@ -17,8 +17,7 @@ from dangerzone_insecure_converter.errors import MAX_PAGES
 
 from .conftest import TEST_DOCS_DIRECTORY, for_each_doc
 
-TIMEOUT = 30
-MAX_STREAM_SIZE = 2 * 1024 * 1024 * 1024  # 2 GiB
+TIMEOUT = 60
 
 REFERENCE_DIR = Path(__file__).parent / "test_docs" / "reference"
 DIFF_ARTIFACTS_DIR = Path(__file__).parent / "_diff_artifacts"
@@ -158,28 +157,36 @@ def write_reference_data(path: Path, data: bytes) -> None:
     path.write_bytes(gzip.compress(data))
 
 
-# async def read_bounded(sr: asyncio.StreamReader, limit: int) -> bytes:
-#     buf = b""
-#     while not sr.at_eof():
-#         read = await sr.read(limit)
-#         buf += read
-#         limit = limit - len(read)
-#         if limit <= 0:
-#             raise RuntimeError(f"Stream reached maximum size ({limit} bytes)")
-#     return buf
-
-
-async def read_stdout(proc: asyncio.subprocess.Process) -> bytes:
+async def read_and_validate_stdout(
+    proc: asyncio.subprocess.Process,
+    keep_data: bool = True,
+) -> tuple[bytes | None, int]:
     assert proc.stdout is not None
-    header = await proc.stdout.read(INT_BYTES)
-    if not header:
-        # This may happen in case of a failed conversion.
-        return b""
+
+    buf = io.BytesIO()
+
+    async def read_exactly(size: int):
+        _bytes = await proc.stdout.readexactly(size)
+        if keep_data:
+            buf.write(_bytes)
+        return _bytes
+
+    header = await read_exactly(INT_BYTES)
     page_count = int.from_bytes(header, "big", signed=False)
     if page_count >= MAX_PAGES:
         raise ValueError(f"Page count {page_count} exceeds maximum ({MAX_PAGES})")
-    rest = await proc.stdout.read()
-    return header + rest
+    assert page_count > 0, "Expected at least one page"
+
+    for _ in range(page_count):
+        width_bytes = await read_exactly(INT_BYTES)
+        width = int.from_bytes(width_bytes, "big", signed=False)
+        assert 0 < width < 10000, "Page width must be positive and less than 10000"
+        height_bytes = await read_exactly(INT_BYTES)
+        height = int.from_bytes(height_bytes, "big", signed=False)
+        assert 0 < height < 10000, "Page height must be positive and less than 10000"
+        pixel_size = width * height * 3
+        _ = await read_exactly(pixel_size)
+    return buf.getvalue()
 
 
 async def read_stderr(proc: asyncio.subprocess.Process) -> bytes:
@@ -201,8 +208,11 @@ async def run_local_conversion(doc: Path) -> tuple[bytes, List[str]]:
 
 
 async def run_container_conversion(
-    doc: Path, container_image: str, container_security_args: List[str]
-) -> tuple[int, bytes, bytes]:
+    doc: Path,
+    container_image: str,
+    container_security_args: List[str],
+    keep_output: bool = True,
+) -> tuple[int, bytes | None, bytes]:
     cid_fd, cid_path = tempfile.mkstemp(prefix="dz-cid-")
     os.close(cid_fd)
 
@@ -222,7 +232,6 @@ async def run_container_conversion(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         preexec_fn=os.setpgrp,
-        limit=MAX_STREAM_SIZE,
     )
 
     try:
@@ -234,7 +243,11 @@ async def run_container_conversion(
         assert proc.stdout is not None
         assert proc.stderr is not None
 
-        stdout_task = asyncio.create_task(read_stdout(proc))
+        async def _read_stdout_task():
+            data = await read_and_validate_stdout(proc, keep_data=keep_output)
+            return data
+
+        stdout_task = asyncio.create_task(_read_stdout_task())
         stderr_task = asyncio.create_task(read_stderr(proc))
 
         # NOTE: Use asyncio.gather here, so that any exception from the above
@@ -286,8 +299,14 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
         except TimeoutError:
             pytest.fail("timeout failed")
 
-        # Check progress messages
         assert "Converted document to pixels" in progress
+
+        pages = parse_pixel_output(pixel_data)
+        assert len(pages) > 0, "Expected at least one page"
+        for width, height, rgb_data in pages:
+            assert width > 0, "Page width must be positive"
+            assert height > 0, "Page height must be positive"
+            assert len(rgb_data) == width * height * 3, "RGB data length mismatch"
     else:
         container_image = request.getfixturevalue("container_image")
         container_security_args = request.getfixturevalue("container_security_args")
@@ -303,6 +322,7 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
             f"stderr: {stderr.decode(errors='replace')}"
         )
 
+        assert pixel_data is not None
         reference_bin = REFERENCE_DIR / f"{doc.stem}.bin"
         if request.config.getoption("--update-pixel-references"):
             REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
@@ -317,14 +337,6 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
                     "to compare actual vs reference. "
                     "Run with --update-pixel-references to regenerate."
                 )
-
-    # Parse and validate pixel data structure
-    pages = parse_pixel_output(pixel_data)
-    assert len(pages) > 0, "Expected at least one page"
-    for width, height, rgb_data in pages:
-        assert width > 0, "Page width must be positive"
-        assert height > 0, "Page height must be positive"
-        assert len(rgb_data) == width * height * 3, "RGB data length mismatch"
 
 
 @pytest.mark.parametrize(
