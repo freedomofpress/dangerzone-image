@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -103,7 +103,7 @@ def _consult_reproduce_cache(digest, commit, repository, image_name):
         return False
     data = json.loads(path.read_text())
     cached_time = datetime.fromisoformat(data["timestamp"])
-    if datetime.utcnow() - cached_time > CACHE_TTL:
+    if datetime.now(timezone.utc) - cached_time > CACHE_TTL:
         logger.debug("Reproduce cache for %s is stale (TTL: %s)", digest, CACHE_TTL)
         return False
     return (
@@ -122,7 +122,7 @@ def _write_reproduce_cache(digest, commit, repository, image_name):
                 "commit": commit,
                 "repository": repository,
                 "image_name": image_name,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
     )
