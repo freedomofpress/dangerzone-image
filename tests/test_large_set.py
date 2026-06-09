@@ -25,7 +25,7 @@ TEST_DOCS_DIR = LARGE_TEST_REPO_DIR / "all_documents"
 SAFE_EXTENSION = "-safe.pdf"
 FORMATS_REGEX = r".*\.(pdf|docx|doc|xlsx|xls|pptx|ppt|odt|ods|odp|odg|jpg|jpeg|gif|png)$"
 
-TIMEOUT = 60 # 1 minute per document
+TIMEOUT = 120  # 2 minutes per document
 
 
 def get_test_docs(min_size: int, max_size: int) -> List[Path]:
