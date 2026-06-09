@@ -158,18 +158,18 @@ def write_reference_data(path: Path, data: bytes) -> None:
     path.write_bytes(gzip.compress(data))
 
 
-async def read_bounded(sr: asyncio.StreamReader, limit: int) -> bytes:
-    buf = b""
-    while not sr.at_eof():
-        read = await sr.read(limit)
-        buf += read
-        limit = limit - len(read)
-        if limit <= 0:
-            raise RuntimeError(f"Stream reached maximum size ({limit} bytes)")
-    return buf
+# async def read_bounded(sr: asyncio.StreamReader, limit: int) -> bytes:
+#     buf = b""
+#     while not sr.at_eof():
+#         read = await sr.read(limit)
+#         buf += read
+#         limit = limit - len(read)
+#         if limit <= 0:
+#             raise RuntimeError(f"Stream reached maximum size ({limit} bytes)")
+#     return buf
 
 
-async def read_stdout_bounded(proc: asyncio.subprocess.Process) -> bytes:
+async def read_stdout(proc: asyncio.subprocess.Process) -> bytes:
     assert proc.stdout is not None
     header = await proc.stdout.read(INT_BYTES)
     if not header:
@@ -178,13 +178,13 @@ async def read_stdout_bounded(proc: asyncio.subprocess.Process) -> bytes:
     page_count = int.from_bytes(header, "big", signed=False)
     if page_count >= MAX_PAGES:
         raise ValueError(f"Page count {page_count} exceeds maximum ({MAX_PAGES})")
-    rest = await read_bounded(proc.stdout, MAX_STREAM_SIZE)
+    rest = await proc.stdout.read()
     return header + rest
 
 
-async def read_stderr_bounded(proc: asyncio.subprocess.Process) -> bytes:
+async def read_stderr(proc: asyncio.subprocess.Process) -> bytes:
     assert proc.stderr is not None
-    return await read_bounded(proc.stderr, MAX_STREAM_SIZE)
+    return await proc.stderr.read()
 
 
 async def run_local_conversion(doc: Path) -> tuple[bytes, List[str]]:
@@ -222,6 +222,7 @@ async def run_container_conversion(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         preexec_fn=os.setpgrp,
+        limit=MAX_STREAM_SIZE,
     )
 
     try:
@@ -233,8 +234,8 @@ async def run_container_conversion(
         assert proc.stdout is not None
         assert proc.stderr is not None
 
-        stdout_task = asyncio.create_task(read_stdout_bounded(proc))
-        stderr_task = asyncio.create_task(read_stderr_bounded(proc))
+        stdout_task = asyncio.create_task(read_stdout(proc))
+        stderr_task = asyncio.create_task(read_stderr(proc))
 
         # NOTE: Use asyncio.gather here, so that any exception from the above
         # awaitables will cancel the whole group. This way, a parsing error while
