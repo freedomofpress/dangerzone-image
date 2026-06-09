@@ -178,6 +178,12 @@ oci_config: dict[str, typing.Any] = {
             {"type": "uts"},
             {"type": "mount"},
         ],
+        "resources": {
+            "memory": {
+                "limit": 2147483648,
+                "swap": 2147483648,
+            },
+        },
     },
 }
 not_forwarded_env = set(
