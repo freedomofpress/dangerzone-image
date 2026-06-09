@@ -1,6 +1,10 @@
 import asyncio
 import gzip
 import io
+import os
+import signal
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import List, Tuple
 
@@ -197,12 +201,17 @@ async def run_local_conversion(doc: Path) -> tuple[bytes, List[str]]:
 async def run_container_conversion(
     doc: Path, container_image: str, container_security_args: List[str]
 ) -> tuple[int, bytes, bytes]:
+    cid_fd, cid_path = tempfile.mkstemp(prefix="dz-cid-")
+    os.close(cid_fd)
+
     proc = await asyncio.subprocess.create_subprocess_exec(
         "podman",
         "run",
         *container_security_args,
         "--rm",
         "-i",
+        "--cidfile",
+        cid_path,
         container_image,
         "/usr/bin/python3",
         "-m",
@@ -210,29 +219,52 @@ async def run_container_conversion(
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        preexec_fn=os.setpgrp,
     )
 
-    assert proc.stdin is not None
-    proc.stdin.write(doc.read_bytes())
-    await proc.stdin.drain()
-    proc.stdin.close()
+    try:
+        assert proc.stdin is not None
+        proc.stdin.write(doc.read_bytes())
+        await proc.stdin.drain()
+        proc.stdin.close()
 
-    assert proc.stdout is not None
-    assert proc.stderr is not None
+        assert proc.stdout is not None
+        assert proc.stderr is not None
 
-    stdout_task = asyncio.create_task(read_stdout_bounded(proc))
-    stderr_task = asyncio.create_task(read_stderr_bounded(proc))
+        stdout_task = asyncio.create_task(read_stdout_bounded(proc))
+        stderr_task = asyncio.create_task(read_stderr_bounded(proc))
 
-    # NOTE: Use asyncio.gather here, so that any exception from the above
-    # awaitables will cancel the whole group. This way, a parsing error while
-    # reading stdout can cancel the `proc.wait()`, which would otherwise remain
-    # blocked, even if we attempted to kill the process. We have seen at least
-    # one case where the Podman process is killed but `conmon` remains blocked,
-    # and therefore the `.wait()` method hangs.
-    _, stdout, stderr = await asyncio.gather(proc.wait(), stdout_task, stderr_task)
+        # NOTE: Use asyncio.gather here, so that any exception from the above
+        # awaitables will cancel the whole group. This way, a parsing error while
+        # reading stdout can cancel the `proc.wait()`, which would otherwise remain
+        # blocked, even if we attempted to kill the process. We have seen at least
+        # one case where the Podman process is killed but `conmon` remains blocked,
+        # and therefore the `.wait()` method hangs.
+        _, stdout, stderr = await asyncio.gather(proc.wait(), stdout_task, stderr_task)
 
-    assert proc.returncode is not None
-    return proc.returncode, stdout, stderr
+        assert proc.returncode is not None
+        return proc.returncode, stdout, stderr
+    finally:
+        if proc.returncode is None:
+            try:
+                if os.path.exists(cid_path):
+                    container_id = Path(cid_path).read_text().strip()
+                    if container_id:
+                        subprocess.run(
+                            ["podman", "kill", container_id],
+                            capture_output=True,
+                            timeout=10,
+                        )
+            except Exception:
+                pass
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        try:
+            os.unlink(cid_path)
+        except OSError:
+            pass
 
 
 @for_each_doc
