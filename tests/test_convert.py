@@ -170,10 +170,11 @@ async def read_bounded(sr: asyncio.StreamReader, limit: int) -> bytes:
 
 
 async def read_stdout_bounded(proc: asyncio.subprocess.Process) -> bytes:
+    assert proc.stdout is not None
     header = await proc.stdout.read(INT_BYTES)
     if not header:
         # This may happen in case of a failed conversion.
-        return ""
+        return b""
     page_count = int.from_bytes(header, "big", signed=False)
     if page_count >= MAX_PAGES:
         raise ValueError(f"Page count {page_count} exceeds maximum ({MAX_PAGES})")
@@ -182,6 +183,7 @@ async def read_stdout_bounded(proc: asyncio.subprocess.Process) -> bytes:
 
 
 async def read_stderr_bounded(proc: asyncio.subprocess.Process) -> bytes:
+    assert proc.stderr is not None
     return await read_bounded(proc.stderr, MAX_STREAM_SIZE)
 
 
