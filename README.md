@@ -115,3 +115,20 @@ uv run image reproduce --debian-archive-date autodetect ghcr.io/freedomofpress/d
 # Attest, reproduce, and release a container image
 uv run image release --ghcr-signer-path /path/to/ghcr-signer
 ```
+
+## Bump the image dependencies
+
+The container image in this repo is bit-for-bit reproducible, which means that
+its dependencies are frozen in time. The factors that dictate the versions of
+its dependencies are:
+
+* Digest of [base Debian container image](https://hub.docker.com/_/debian)
+* Date of [Debian snapshot archives](https://snapshot.debian.org/)
+* Date of [gVisor Debian archives](https://gvisor.dev/docs/user_guide/install/#specific-release)
+
+To bump the dependencies of the image, first update them in
+([`Dockerfile.env`](Dockerfile.env)). Then regenerate the Dockerfile with:
+
+```
+make Dockerfile
+```
