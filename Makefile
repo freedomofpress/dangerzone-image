@@ -10,3 +10,6 @@ ty:
 
 fix:
 	uv run ruff check --fix
+
+Dockerfile: Dockerfile.env Dockerfile.in ## Regenerate the Dockerfile from its template
+	poetry run jinja2 Dockerfile.in Dockerfile.env > Dockerfile
