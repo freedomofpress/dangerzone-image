@@ -88,6 +88,7 @@ def get_runtime_security_args() -> List[str]:
 
 
 def build_image() -> None:
+    """Invoke image.py and load the resulting tarball into podman."""
     subprocess.run(
         [sys.executable, str(BUILD_IMAGE_SCRIPT), "build"],
         check=True,
