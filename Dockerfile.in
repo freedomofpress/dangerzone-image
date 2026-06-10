@@ -52,11 +52,8 @@ RUN \
   strip_path \
       /usr/bin/runsc-metric-server \
       /usr/bin/containerd-shim-runsc-v1 && \
-  : "Libreoffice: remove unused libraries" && \
-  : "Do not remove libwpg (WordPerfect Graphics) as it might be used by .odg files" && \
-  for lib in libabw libcdr libe-book libetonyek libfreehand libmspub \
-             libmwaw libpagemaker libqxp libstaroffice libvisio \
-             libwpd libwps libzmf; do \
+  : "Libreoffice: remove import libraries used by libwpftdrawlo.so, whose formats we do not support" && \
+  for lib in libcdr libfreehand libmspub libpagemaker libqxp libvisio libzmf; do \
     matches=$(ls ${MULTIARCH_DIR}/${lib}-*.so* 2>/dev/null) && \
     test -n "${matches}" || { echo "strip: no files matched ${lib}-*" >&2; exit 1; } && \
     rm -f ${MULTIARCH_DIR}/${lib}-*.so*; \
