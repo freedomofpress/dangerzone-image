@@ -7,7 +7,7 @@ from typing import List
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-BUILD_IMAGE_SCRIPT = REPO_ROOT / "build-image.py"
+BUILD_IMAGE_SCRIPT = REPO_ROOT / "src" / "scripts" / "image.py"
 IMAGE_ID_FILE = REPO_ROOT / "image-id.txt"
 
 # Add src directory to Python path for imports
@@ -105,19 +105,19 @@ def get_runtime_security_args() -> List[str]:
 
 
 def build_image() -> None:
-    """Invoke the build-image.py script and load the resulting tarball into podman"""
+    """Invoke the image.py script and load the resulting tarball into podman"""
     subprocess.run(
-        [sys.executable, str(BUILD_IMAGE_SCRIPT)],
+        [sys.executable, str(BUILD_IMAGE_SCRIPT), "build"],
         check=True,
         cwd=REPO_ROOT,
     )
     if not IMAGE_ID_FILE.exists():
         raise pytest.UsageError(
-            f"build-image.py did not produce {IMAGE_ID_FILE}. Build may have failed silently."
+            f"image.py did not produce {IMAGE_ID_FILE}. Build may have failed silently."
         )
     tarball = REPO_ROOT / "container.tar"
     if not tarball.exists():
-        raise pytest.UsageError(f"build-image.py did not produce {tarball}.")
+        raise pytest.UsageError(f"image.py did not produce {tarball}.")
     subprocess.run(
         ["podman", "load", "-i", str(tarball)],
         check=True,
