@@ -821,7 +821,7 @@
         </div>
         <div class="view-switch" role="navigation" aria-label="Report view">
             <a href="index.html" data-view="latest">Latest</a>
-            <a href="nightly.html" data-view="nightly">Nightly</a>
+            <a href="nightly/" data-view="nightly">Nightly</a>
         </div>
         <div class="severity-info">
             <div class="severity-box" id="critical">
@@ -896,6 +896,11 @@
                     {{- end }}
                 </tbody>
             </table>
+        </div>
+        <div>
+            <p>
+                You can always <a href="grype.json" download="grype.json">download 💾</a> the full Grype report in JSON format.
+            </p>
         </div>
     </div>
     <script>

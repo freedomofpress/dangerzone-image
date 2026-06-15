@@ -62,6 +62,15 @@ jobs:
             --template templates/html.tmpl \
             --file nightly.html
 
+      - name: Generate JSON report (main build)
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          grype "$IMAGE_REF" \
+            --config .grype.yaml \
+            --output json \
+            --file nightly.json
+
       - name: Generate HTML report (released :latest)
         run: |
           grype ghcr.io/freedomofpress/dangerzone/v1:latest \
@@ -70,13 +79,23 @@ jobs:
             --template templates/html.tmpl \
             --file report.html
 
+      - name: Generate JSON report (released :latest)
+        run: |
+          grype ghcr.io/freedomofpress/dangerzone/v1:latest \
+            --config .grype.yaml \
+            --output json \
+            --file report.json
+
       - name: Upload reports
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: security-report
           path: |
             report.html
+            report.json
             nightly.html
+            nightly.json
+
 
   deploy:
     name: Deploy to GitHub Pages
@@ -97,6 +116,10 @@ jobs:
       - name: Assemble site
         run: |
           mv report.html index.html
+          mv report.json grype.json
+          mkdir nightly/
+          mv nightly.html nightly/index.html
+          mv nightly.json nightly/grype.json
           echo "cves.dangerzone.rocks" > CNAME
 
       - name: Setup Pages
