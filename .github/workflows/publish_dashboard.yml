@@ -86,15 +86,19 @@ jobs:
             --output json \
             --file report.json
 
+      - name: Create site structure
+        run: |
+          mkdir -p security-report/nightly
+          mv report.html security-report/index.html
+          mv report.json security-report/grype.json
+          mv nightly.html security-report/nightly/index.html
+          mv nightly.json security-report/nightly/grype.json
+
       - name: Upload reports
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: security-report
-          path: |
-            report.html
-            report.json
-            nightly.html
-            nightly.json
+          path: security-report/*
 
 
   deploy:
@@ -113,13 +117,8 @@ jobs:
         with:
           name: security-report
 
-      - name: Assemble site
+      - name: Specify CNAME
         run: |
-          mv report.html index.html
-          mv report.json grype.json
-          mkdir nightly/
-          mv nightly.html nightly/index.html
-          mv nightly.json nightly/grype.json
           echo "cves.dangerzone.rocks" > CNAME
 
       - name: Setup Pages
