@@ -19,6 +19,13 @@ ignore:
   - package:
       name: libgnutls30t64
 
+  # CVE-2026-55200, and other libssh2 CVEs
+  # ======================================
+  # Verdict: libssh2 is used for SSH connections, but the container image is
+  # airgapped, and therefore SSH is not used.
+  - package:
+      name: libssh2-1t64
+
   # CVE-2026-42496, and other perl-base CVEs
   # ========================================
   # Verdict: Vulnerabilities in the perl-base package cannot be used to achieve
