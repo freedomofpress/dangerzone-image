@@ -47,7 +47,7 @@ jobs:
       - name: Verify that the Dockerfile matches the committed template and params
         run: |-
           cp Dockerfile Dockerfile.orig
-          make Dockerfile
+          make -B Dockerfile
           diff Dockerfile.orig Dockerfile
 
   prepare:
