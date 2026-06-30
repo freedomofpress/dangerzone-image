@@ -50,6 +50,8 @@ Requires:       libreoffice
 
 install -pm 755 -d %{buildroot}/etc/qubes-rpc
 install -pm 755 qubes/qubes-rpc/* %{buildroot}/etc/qubes-rpc
+# No need to install the `image` script, since it's dev-facing.
+rm -f %{buildroot}%{_bindir}/image
 
 %check
 %pyproject_check_import
