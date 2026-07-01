@@ -269,7 +269,9 @@ jobs:
           runtime: docker
           source_date_epoch: ${{ needs.merge.outputs.source_date_epoch }}
           build-args: DEBIAN_ARCHIVE_DATE=${{ needs.merge.outputs.debian_archive_date }}
-          buildkit_image: moby/buildkit:latest
+          # Pin the buildkit version to v0.30.0 as 0.31.0 onwards use oci-mediatypes by default
+          # See https://github.com/freedomofpress/repro-build/issues/3
+          buildkit_image: moby/buildkit:v0.30.0
           annotations: rocks.dangerzone.debian_archive_date=${{ needs.merge.outputs.debian_archive_date }}
 
   sign:
