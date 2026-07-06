@@ -10,10 +10,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD_IMAGE_SCRIPT = REPO_ROOT / "src" / "scripts" / "image.py"
 IMAGE_ID_FILE = REPO_ROOT / "image-id.txt"
 
-# Add src directory to Python path for imports
-# src_dir = Path(__file__).parent.parent / "src"
-# sys.path.insert(0, str(src_dir))
-
 TESTS_DIRECTORY = Path(__file__).parent
 SAFE_EXTENSION = "-safe.pdf"
 TEST_DOCS_DIRECTORY = TESTS_DIRECTORY / "test_docs"
@@ -46,7 +42,6 @@ test_docs = [
     )
 ]
 
-# Pytest parameter decorators
 for_each_doc = pytest.mark.parametrize(
     "doc", test_docs, ids=[str(doc.name) for doc in test_docs]
 )
@@ -54,11 +49,6 @@ for_each_doc = pytest.mark.parametrize(
 
 @pytest.fixture
 def bad_doc(request: pytest.FixtureRequest, tmp_path: Path) -> Path:
-    """Fixture for parametrized error tests.
-
-    Accepts a Path/str to a document, or the string "pdf_11k_pages" to
-    use the 11k-page fixture document (extracted from its zip on demand).
-    """
     if request.param == "pdf_11k_pages":
         filename = "sample-11k-pages.pdf"
         zip_path = TEST_DOCS_DIRECTORY / f"{filename}.zip"
@@ -69,13 +59,6 @@ def bad_doc(request: pytest.FixtureRequest, tmp_path: Path) -> Path:
 
 
 def get_runtime_security_args() -> List[str]:
-    """Return the security arguments for running the conversion container.
-
-    Mirrors Container.get_runtime_security_args() defined in:
-      dangerzone/isolation_provider/container.py
-
-    Keep this function in sync with the upstream source of truth.
-    """
     result = subprocess.run(
         ["podman", "version", "-f", "{{.Client.Version}}"],
         capture_output=True,
@@ -105,7 +88,6 @@ def get_runtime_security_args() -> List[str]:
 
 
 def build_image() -> None:
-    """Invoke the image.py script and load the resulting tarball into podman"""
     subprocess.run(
         [sys.executable, str(BUILD_IMAGE_SCRIPT), "build"],
         check=True,
@@ -127,7 +109,6 @@ def build_image() -> None:
 
 @pytest.fixture
 def container_image(request: pytest.FixtureRequest) -> str:
-    """Return the container image to use for container conversion tests."""
     image = request.config.getoption("--container-image")
     if not image and IMAGE_ID_FILE.exists():
         image = IMAGE_ID_FILE.read_text().strip()
@@ -141,7 +122,6 @@ def container_image(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture
 def container_security_args() -> List[str]:
-    """Return the security args for running the container, mirroring container.py."""
     try:
         return get_runtime_security_args()
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
@@ -153,10 +133,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--update-pixel-references",
         action="store_true",
         default=False,
-        help=(
-            "Regenerate reference pixel data (.bin files, gzip-compressed) using "
-            "container conversion"
-        ),
+        help="Regenerate reference pixel data (.bin files, gzip-compressed) using container conversion",
     )
     parser.addoption(
         "--container-image",
@@ -173,20 +150,17 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--build",
         action="store_true",
         default=False,
-        help="Build the container image via build-image.py before running tests.",
+        help="Build the container image via image.py before running tests.",
     )
 
 
 def pytest_configure(config: pytest.Config) -> None:
     if config.getoption("--local") and config.getoption("--update-pixel-references"):
         raise pytest.UsageError(
-            "--update-pixel-references must run in a container; do not combine with "
-            "--local."
+            "--update-pixel-references must run in a container; do not combine with --local."
         )
     if config.getoption("--build") and config.getoption("--local"):
-        raise pytest.UsageError(
-            "--build is meaningless with --local (no container is used)."
-        )
+        raise pytest.UsageError("--build is meaningless with --local (no container is used).")
     if config.getoption("--build") and config.getoption("--container-image"):
         raise pytest.UsageError("--build and --container-image are mutually exclusive.")
     if config.getoption("--build"):
@@ -194,6 +168,5 @@ def pytest_configure(config: pytest.Config) -> None:
     if not config.getoption("--local"):
         if not config.getoption("--container-image") and not IMAGE_ID_FILE.exists():
             raise pytest.UsageError(
-                "No container image available. Provide --container-image, run "
-                "with --build, or use --local."
+                "No container image available. Provide --container-image, run with --build, or use --local."
             )
