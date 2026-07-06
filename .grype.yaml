@@ -289,3 +289,15 @@ ignore:
   # conversion is handled by LibreOffice. The Debian security team also classifies
   # this as a minor issue (no-dsa).
   - vulnerability: CVE-2026-7210
+
+  # CVE-2026-58016
+  # ==============
+  #
+  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-58016
+  #
+  # There's a parsing issue in Glib regarding D-Bus messages. The impact of this
+  # bug is Denial-of-Service.
+  #
+  # Verdict: Dangerzone is not affected because the D-Bus service is not running
+  # in the container, and the host one does not leak into the container.
+  - vulnerability: CVE-2026-58016
