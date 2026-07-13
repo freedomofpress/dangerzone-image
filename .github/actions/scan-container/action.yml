@@ -1,0 +1,42 @@
+name: Scan Container
+description: Scans a Dangerzone container image for vulnerabilities
+inputs:
+  image:
+    description: Image to scan
+    required: true
+  severity-cutoff:
+    description: Severity cutoff for the scan
+    required: false
+    default: critical
+  upload-sarif:
+    description: Whether to upload the SARIF report
+    required: false
+    default: false
+  sarif-category:
+    description: Category for the SARIF report
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Scan container image
+      uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+      id: scan
+      with:
+        image: ${{ inputs.image }}
+        fail-build: true
+        only-fixed: false
+        severity-cutoff: ${{ inputs.severity-cutoff }}
+
+    - name: Upload container scan report
+      if: ${{ inputs.upload-sarif && !cancelled() }}
+      uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif }}
+        category: ${{ inputs.sarif-category }}
+
+    - name: Inspect container scan report
+      if: always()
+      shell: bash
+      env:
+        SCAN_SARIF: ${{ steps.scan.outputs.sarif }}
+      run: cat "$SCAN_SARIF"
