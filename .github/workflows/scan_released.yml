@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Severity cutoff is 'critical' by default, except for the 5th and 20th of
+  # month (i.e., biweekly), where we turn it to 'high'.
+  SEVERITY_CUTOFF: ${{ github.event_name == 'schedule' && (format('{0}', github.event.schedule) == '0 0 5 * *' || format('{0}', github.event.schedule) == '0 0 20 * *') && 'high' || 'critical' }}
+
 jobs:
   security-scan-released:
     strategy:
@@ -24,25 +29,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      # NOTE: Scan first without failing, else we won't be able to read the scan
-      # report.
-      - name: Scan container image (no fail)
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
-        id: scan_container
-        with:
-          image: "ghcr.io/freedomofpress/dangerzone/v1:latest"
-          fail-build: false
-          only-fixed: false
-          severity-cutoff: critical
-      - name: Inspect container scan report
-        env:
-          SARIF_PATH: ${{ steps.scan_container.outputs.sarif }}
-        run: cat "$SARIF_PATH"
 
-      - name: Scan container image
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+      - name: Scan container
+        uses: ./.github/actions/scan-container
         with:
           image: "ghcr.io/freedomofpress/dangerzone/v1:latest"
-          fail-build: true
-          only-fixed: false
-          severity-cutoff: critical
+          severity-cutoff: ${{ env.SEVERITY_CUTOFF }}
+          upload-sarif: true
+          sarif-category: container-${{ matrix.arch }}

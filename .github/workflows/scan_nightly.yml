@@ -41,24 +41,9 @@ jobs:
       - name: Get image ref
         id: image
         run: echo "ref=$(cat image-id.txt)" >> $GITHUB_OUTPUT
-      # NOTE: Scan first without failing, else we won't be able to read the scan
-      # report.
-      - name: Scan container image (no fail)
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
-        id: scan_container
+      - name: Scan container
+        uses: ./.github/actions/scan-container
         with:
           image: ${{ steps.image.outputs.ref }}
-          fail-build: false
-          only-fixed: false
           severity-cutoff: critical
-      - name: Inspect container scan report
-        env:
-          SARIF_PATH: ${{ steps.scan_container.outputs.sarif }}
-        run: cat "$SARIF_PATH"
-      - name: Scan container image
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
-        with:
-          image: ${{ steps.image.outputs.ref }}
-          fail-build: true
-          only-fixed: false
-          severity-cutoff: critical
+          upload-sarif: false
