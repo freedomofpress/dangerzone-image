@@ -56,8 +56,7 @@ def write_diff_index() -> None:
         if not sub.is_dir():
             continue
         page_nums = sorted(
-            int(p.stem.rsplit("-", 1)[1])
-            for p in sub.glob("actual-page-*.png")
+            int(p.stem.rsplit("-", 1)[1]) for p in sub.glob("actual-page-*.png")
         )
         if page_nums:
             docs.append((sub.name, page_nums))
@@ -69,9 +68,9 @@ def write_diff_index() -> None:
             p = f"{i:03d}"
             rows.append(
                 '<div class="pair">'
-                f'<figure><figcaption>actual page {i}</figcaption>'
+                f"<figure><figcaption>actual page {i}</figcaption>"
                 f'<img src="{name}/actual-page-{p}.png" loading="lazy"></figure>'
-                f'<figure><figcaption>reference page {i}</figcaption>'
+                f"<figure><figcaption>reference page {i}</figcaption>"
                 f'<img src="{name}/reference-page-{p}.png" loading="lazy"></figure>'
                 "</div>"
             )
@@ -91,7 +90,7 @@ def write_diff_index() -> None:
 </style></head><body>
 <h1>Pixel diff: actual (left) vs reference (right)</h1>
 <nav>{nav}</nav>
-{''.join(rows)}
+{"".join(rows)}
 </body></html>
 """
     (DIFF_ARTIFACTS_DIR / "diff.html").write_text(html)
