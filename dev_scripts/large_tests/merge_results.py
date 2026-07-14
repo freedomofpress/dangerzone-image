@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
+"""Merge multiple JUnit XML result files from parallel test runs into one."""
 
 import glob
 import sys
 import xml.etree.ElementTree as ET
 
 
-def combine_xmls(xml_files, output_file):
+def combine_xmls(xml_files: list[str], output_file: str) -> None:
     total_errors = 0
     total_failures = 0
     total_skipped = 0
@@ -17,7 +18,6 @@ def combine_xmls(xml_files, output_file):
 
     for xml_file in xml_files:
         print(f"Parsing '{xml_file}'")
-
         try:
             tree = ET.parse(xml_file)
         except ET.ParseError as e:
@@ -53,12 +53,12 @@ def combine_xmls(xml_files, output_file):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: merge_results.py <folder-with-xmls> <output-file>", file=sys.stderr)
+        sys.exit(1)
     folder = sys.argv[1]
     output = sys.argv[2]
-    print(
-        f"Will search for XML files in '{folder}' and create a combined XML in"
-        f" '{output}'"
-    )
+    print(f"Will search for XML files in '{folder}' and create a combined XML in '{output}'")
     xml_files = glob.glob(f"{folder}/*.xml")
     print(f"Found {len(xml_files)} XML file(s)")
     combine_xmls(xml_files, output)

@@ -302,7 +302,7 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
                 run_local_conversion(doc), timeout=TIMEOUT
             )
         except TimeoutError:
-            pytest.fail("timeout failed")
+            pytest.fail(f"Local conversion of {doc.name} timed out after {TIMEOUT}s")
 
         assert "Converted document to pixels" in progress
 
@@ -321,7 +321,7 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
                 timeout=TIMEOUT,
             )
         except TimeoutError:
-            pytest.fail("timeout failed")
+            pytest.fail(f"Container conversion of {doc.name} timed out after {TIMEOUT}s")
         assert returncode == 0, (
             f"Container conversion failed (exit {returncode}).\n"
             f"stderr: {stderr.decode(errors='replace')}"
@@ -363,7 +363,7 @@ async def test_bad_pdf(
             with pytest.raises(expected_error):
                 await asyncio.wait_for(run_local_conversion(bad_doc), timeout=TIMEOUT)
         except TimeoutError:
-            pytest.fail("timeout failed")
+            pytest.fail(f"Local conversion of {bad_doc.name} timed out after {TIMEOUT}s")
     else:
         container_image = request.getfixturevalue("container_image")
         container_security_args = request.getfixturevalue("container_security_args")
@@ -375,7 +375,7 @@ async def test_bad_pdf(
                 timeout=TIMEOUT,
             )
         except TimeoutError:
-            pytest.fail("timeout failed")
+            pytest.fail(f"Container conversion of {bad_doc.name} timed out after {TIMEOUT}s")
         assert returncode == expected_error.error_code, (
             f"Container conversion failed with exit {returncode} "
             f"(expected {expected_error.error_code}).\n"

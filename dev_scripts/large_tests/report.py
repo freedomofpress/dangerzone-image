@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
+"""Generate a human-readable test report from a JUnit XML file."""
 
 import re
 import sys
 import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 DOC_TO_PIXELS_LOG_START = "----- DOC TO PIXELS LOG START -----"
 DOC_TO_PIXELS_LOG_END = "----- DOC TO PIXELS LOG END -----"
@@ -45,16 +45,15 @@ def is_expected_line(line: str) -> bool:
     return any(p.match(line) for p in EXPECTED_PATTERNS)
 
 
-def is_blank_line(line: str) -> bool:
-    return line == ""
+def scrub_and_filter(lines: list[str]) -> list[str]:
+    return [l for l in (scrub_container_line(line) for line in lines) if not is_expected_line(l)]
 
 
 def parse_junit(xml_file: str) -> ET.Element:
-    tree = ET.parse(xml_file)
-    return tree.getroot()
+    return ET.parse(xml_file).getroot()
 
 
-def count_results(root: ET.Element) -> Dict[str, int]:
+def count_results(root: ET.Element) -> dict[str, int]:
     total_errors = 0
     total_failures = 0
     total_skipped = 0
@@ -72,7 +71,7 @@ def count_results(root: ET.Element) -> Dict[str, int]:
     }
 
 
-def get_test_cases(root: ET.Element) -> List[ET.Element]:
+def get_test_cases(root: ET.Element) -> list[ET.Element]:
     cases = []
     for testsuite in root.findall("testsuite"):
         cases.extend(testsuite.findall("testcase"))
@@ -95,23 +94,25 @@ def get_extension(name: str) -> str:
     return "none"
 
 
+SIZE_BUCKET_NAMES = ["0KB  -  10KB", "10KB - 100KB", "100KB - 10MB", "10MB - 100MB"]
+
+
 def get_size_bucket(name: str) -> str:
     if "10K_docs" in name:
-        return "0KB  -  10KB"
+        return SIZE_BUCKET_NAMES[0]
     elif "100K_docs" in name:
-        return "10KB - 100KB"
+        return SIZE_BUCKET_NAMES[1]
     elif "10M_docs" in name:
-        return "100KB - 10MB"
+        return SIZE_BUCKET_NAMES[2]
     elif "100M_docs" in name:
-        return "10MB - 100MB"
+        return SIZE_BUCKET_NAMES[3]
     return "unknown"
 
 
 def extract_captured_text(testcase: ET.Element, tag: str) -> str:
     elem = testcase.find(tag)
     if elem is not None and elem.text:
-        text = elem.text
-        lines = text.split("\n")
+        lines = elem.text.split("\n")
         content_lines = []
         in_content = False
         for line in lines:
@@ -136,7 +137,7 @@ def extract_container_output(testcase: ET.Element) -> str:
     return ""
 
 
-def get_container_lines(testcase: ET.Element) -> List[str]:
+def get_container_lines(testcase: ET.Element) -> list[str]:
     output = extract_container_output(testcase)
     if output:
         return [line.rstrip() for line in output.split("\n")]
@@ -166,7 +167,7 @@ def generate_report(xml_file: str) -> str:
     lines.append("")
 
     ext_counter = Counter()
-    size_timing: Dict[str, dict] = {}
+    size_timing: dict[str, dict] = {}
     for tc in test_cases:
         name = tc.attrib.get("name", "")
         ext = get_extension(name)
@@ -174,7 +175,7 @@ def generate_report(xml_file: str) -> str:
         ext_counter[ext] += 1
         d = size_timing.setdefault(bucket, {"count": 0, "total": 0.0})
         d["count"] += 1
-        d["total"] += float(tc.attrib.get("time", 0))
+        d["total"] += float(tc.attrib.get("time", 0.0))
 
     lines.append("=== TEST OVERVIEW ===")
     lines.append("")
@@ -186,7 +187,7 @@ def generate_report(xml_file: str) -> str:
     lines.append(f"    {'Bucket':<15} {'Docs':>6} {'Total':>10} {'Avg':>8}")
     grand_docs = 0
     grand_total = 0.0
-    for bucket in ["0KB  -  10KB", "10KB - 100KB", "100KB - 10MB", "10MB - 100MB"]:
+    for bucket in SIZE_BUCKET_NAMES:
         d = size_timing.get(bucket)
         if d and d["count"]:
             grand_docs += d["count"]
@@ -199,13 +200,12 @@ def generate_report(xml_file: str) -> str:
     lines.append("")
     lines.append("")
 
-    all_lines: List[str] = []
+    all_lines = []
     for tc in test_cases:
         all_lines.extend(get_container_lines(tc))
 
     if all_lines:
-        scrubbed = [scrub_container_line(line) for line in all_lines]
-        filtered = [l for l in scrubbed if not is_expected_line(l)]
+        filtered = scrub_and_filter(all_lines)
         counter = Counter(filtered)
         lines.append("=== MOST COMMON CONTAINER OUTPUT ===")
         lines.append("")
@@ -215,14 +215,13 @@ def generate_report(xml_file: str) -> str:
         lines.append("")
         lines.append("")
 
-    fail_lines: List[str] = []
+    fail_lines = []
     for tc in test_cases:
         if get_test_status(tc) in ("FAIL", "ERROR"):
             fail_lines.extend(get_container_lines(tc))
 
     if fail_lines:
-        scrubbed = [scrub_container_line(line) for line in fail_lines]
-        filtered = [l for l in scrubbed if not is_expected_line(l)]
+        filtered = scrub_and_filter(fail_lines)
         counter = Counter(filtered)
         lines.append("=== FAILURE REASONS ===")
         lines.append("")
@@ -232,7 +231,7 @@ def generate_report(xml_file: str) -> str:
         lines.append("")
         lines.append("")
 
-    timeout_files: List[str] = []
+    timeout_files = []
     for tc in test_cases:
         output = extract_captured_text(tc, "system-out")
         if "TIMEOUT EXCEEDED" in output:
@@ -255,16 +254,14 @@ def generate_report(xml_file: str) -> str:
     lines.append("")
     lines.append("")
 
-    failed_entries: List[Tuple[str, List[str]]] = []
+    failed_entries: list[tuple[str, list[str]]] = []
     for tc in test_cases:
         if get_test_status(tc) in ("FAIL", "ERROR"):
             name = tc.attrib.get("name", "")
             m = re.search(r"\[([^\]]+)\]", name)
             fname = m.group(1) if m else name
             container_lines = get_container_lines(tc)
-            scrubbed = [scrub_container_line(l) for l in container_lines]
-            filtered = [l for l in scrubbed if not is_expected_line(l)]
-            preview = filtered[:3]
+            preview = scrub_and_filter(container_lines)[:3]
             failed_entries.append((fname, preview))
 
     lines.append("=== FAILED FILES ===")
@@ -283,5 +280,7 @@ def generate_report(xml_file: str) -> str:
 
 
 if __name__ == "__main__":
-    xml_file = sys.argv[1]
-    print(generate_report(xml_file))
+    if len(sys.argv) < 2:
+        print("Usage: report.py <junit-xml-file>", file=sys.stderr)
+        sys.exit(1)
+    print(generate_report(sys.argv[1]))
