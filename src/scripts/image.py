@@ -813,6 +813,45 @@ def release(
     else:
         sign_image(root_manifest, ghcr_signer_path)
 
+    if dry:
+        click.echo("⏩ Skipping report generation and commit (dry run)")
+        return
+
+    signatures_dir = Path(ghcr_signer_path) / "SIGNATURES"
+
+    click.echo("\n📝 Generating release report...")
+    try:
+        report_text = generate_report(signatures_dir)
+    except Exception as e:
+        click.echo(f"\n⚠️  Could not generate report: {e!s}", err=True)
+        click.echo("The release was successful, but the report could not be generated.")
+        click.echo("You can generate it manually with: uv run image report")
+        return
+
+    ghcr_signer = Path(ghcr_signer_path)
+    try:
+        run_cmd(["git", "-C", str(ghcr_signer), "add", "SIGNATURES"], check=True)
+        run_cmd(
+            [
+                "git",
+                "-C",
+                str(ghcr_signer),
+                "commit",
+                "-m",
+                f"Add signatures for image {root_manifest}\n\n{report_text}",
+            ],
+            check=True,
+        )
+        click.echo("\n✅ Signatures committed to ghcr-signer repo")
+    except subprocess.CalledProcessError:
+        report_path = ghcr_signer / "report.md"
+        report_path.write_text(report_text)
+        click.echo(
+            f"\n⚠️  Could not commit signatures to the ghcr-signer repo. "
+            f"The report has been saved to {report_path}."
+        )
+        click.echo("You can review and commit manually.")
+
 
 if __name__ == "__main__":
     cli()
