@@ -12,6 +12,8 @@ from dangerzone_insecure_converter.doc_to_pixels import DocumentToPixels
 
 from .conftest import TEST_DOCS_DIRECTORY, for_each_doc
 
+TIMEOUT = 60
+
 REFERENCE_DIR = Path(__file__).parent / "test_docs" / "reference"
 DIFF_ARTIFACTS_DIR = Path(__file__).parent / "_diff_artifacts"
 _GZIP_MAGIC = b"\x1f\x8b"
@@ -163,8 +165,10 @@ async def run_local_conversion(doc: Path) -> tuple[bytes, List[str]]:
             input_file.unlink()
 
 
-async def run_container_conversion(
-    doc: Path, container_image: str, container_security_args: List[str]
+async def _run_container_conversion(
+    doc: Path,
+    container_image: str,
+    container_security_args: List[str],
 ) -> tuple[int, bytes, bytes]:
     proc = await asyncio.subprocess.create_subprocess_exec(
         "podman",
@@ -185,6 +189,21 @@ async def run_container_conversion(
     return proc.returncode, stdout, stderr
 
 
+async def run_container_conversion(
+    doc: Path,
+    container_image: str,
+    container_security_args: List[str],
+    keep_output: bool = True,
+) -> tuple[int, bytes, bytes]:
+    try:
+        return await asyncio.wait_for(
+            _run_container_conversion(doc, container_image, container_security_args),
+            timeout=TIMEOUT,
+        )
+    except TimeoutError:
+        pytest.fail(f"Container conversion of {doc.name} timed out after {TIMEOUT}s")
+
+
 @for_each_doc
 @pytest.mark.asyncio
 async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> None:
@@ -194,7 +213,12 @@ async def test_convert_document(request: pytest.FixtureRequest, doc: Path) -> No
     Reference pixel data comparisons are only performed in container mode.
     """
     if request.config.getoption("--local"):
-        pixel_data, progress = await run_local_conversion(doc)
+        try:
+            pixel_data, progress = await asyncio.wait_for(
+                run_local_conversion(doc), timeout=TIMEOUT
+            )
+        except TimeoutError:
+            pytest.fail(f"Local conversion of {doc.name} timed out after {TIMEOUT}s")
 
         # Check progress messages
         assert "Converted document to pixels" in progress
@@ -249,12 +273,17 @@ async def test_bad_pdf(
 ) -> None:
     """Test that invalid documents raise the expected errors."""
     if request.config.getoption("--local"):
-        with pytest.raises(expected_error):
-            await run_local_conversion(bad_doc)
+        try:
+            with pytest.raises(expected_error):
+                await asyncio.wait_for(run_local_conversion(bad_doc), timeout=TIMEOUT)
+        except TimeoutError:
+            pytest.fail(
+                f"Local conversion of {bad_doc.name} timed out after {TIMEOUT}s"
+            )
     else:
         container_image = request.getfixturevalue("container_image")
         container_security_args = request.getfixturevalue("container_security_args")
-        returncode, _stdout, stderr = await run_container_conversion(
+        returncode, pixel_data, stderr = await run_container_conversion(
             bad_doc, container_image, container_security_args
         )
         assert returncode == expected_error.error_code, (
