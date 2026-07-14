@@ -7,6 +7,7 @@ Subcommands:
     build              Build a reproducible container image
     verify-attestation Verify SLSA provenance attestation for an image
     reproduce          Reproduce a container image and verify its digest
+    report             Generate a release report with CVE comparison
     release            Attest, reproduce, and release a container image
 """
 
@@ -26,6 +27,8 @@ from tempfile import NamedTemporaryFile
 
 import click
 from repro_build import Builder, analyze_tarball
+
+from .report import generate_report
 
 logger = logging.getLogger(__name__)
 
@@ -657,6 +660,28 @@ def reproduce(platform, runtime, no_cache, debian_archive_date, dry, digest):
         digest=digest,
         dry=dry,
     )
+
+
+@cli.command()
+@click.option(
+    "--ghcr-signer-path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the ghcr-signer repository",
+)
+@click.option(
+    "--output",
+    default=None,
+    help="Output Markdown file (default: stdout)",
+)
+def report(ghcr_signer_path, output):
+    """Generate a Markdown report with container build info and CVE comparison."""
+    report_text = generate_report(Path(ghcr_signer_path) / "SIGNATURES")
+    if output:
+        Path(output).write_text(report_text)
+        click.echo(f"\nReport written to {output}", err=True)
+    else:
+        click.echo(report_text)
 
 
 @cli.command()
