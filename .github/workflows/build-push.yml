@@ -73,7 +73,6 @@ jobs:
           echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "full_image_name=${FULL_IMAGE_NAME}" >> $GITHUB_OUTPUT
-          echo "buildkit_image=${BUILDKIT_IMAGE}" >> $GITHUB_OUTPUT
 
   build:
     name: Build ${{ matrix.platform.name }} image
@@ -115,7 +114,7 @@ jobs:
           context: ./src/
           file: Dockerfile
           platforms: ${{ matrix.platform.name }}
-          buildkit_image: ${{ needs.prepare.outputs.buildkit_image }}
+          buildkit_image: docker.io/moby/buildkit:0.31.2@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
           source_date_epoch: ${{ needs.prepare.outputs.source_date_epoch }}
           push: true
           outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image_name }}",push-by-digest=true,push=true,name-canonical=true
@@ -269,9 +268,10 @@ jobs:
           runtime: docker
           source_date_epoch: ${{ needs.merge.outputs.source_date_epoch }}
           build-args: DEBIAN_ARCHIVE_DATE=${{ needs.merge.outputs.debian_archive_date }}
-          # Pin the buildkit version to v0.30.0 as 0.31.0 onwards use oci-mediatypes by default
-          # See https://github.com/freedomofpress/repro-build/issues/3
-          buildkit_image: moby/buildkit:v0.30.0
+          # NOTE: We want the latest BuildKit image only during verification in
+          # a CI context, so that we can catch future regressions as early as
+          # possible.
+          buildkit_image: moby/buildkit:latest
           annotations: rocks.dangerzone.debian_archive_date=${{ needs.merge.outputs.debian_archive_date }}
 
   sign:

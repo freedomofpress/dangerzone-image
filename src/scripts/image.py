@@ -36,6 +36,8 @@ CONTAINER_RUNTIME = "podman"
 ANNOTATION_DATE = "rocks.dangerzone.debian_archive_date={date}"
 CACHE_DIR = Path(tempfile.gettempdir()) / "dangerzone-reproduce-cache"
 CACHE_TTL = timedelta(hours=2)
+BUILDKIT_IMAGE = "docker.io/moby/buildkit:0.31.2@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec"
+
 
 # NOTE: You can grab the SLSA attestation for an image/tag pair with the following
 # commands:
@@ -490,6 +492,7 @@ def build_image(
         annotation=[date_annotation],
         platform=platform,
         dry=dry,
+        buildkit_image=BUILDKIT_IMAGE,
     )
     builder.build()
 
