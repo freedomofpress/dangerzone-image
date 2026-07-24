@@ -29,6 +29,13 @@ RUN \
   apt-get install -y --no-install-recommends apt-transport-https ca-certificates gnupg && \
   gpg -o /usr/share/keyrings/gvisor-archive-keyring.gpg --dearmor /tmp/gvisor.key && \
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases ${GVISOR_ARCHIVE_DATE} main" > /etc/apt/sources.list.d/gvisor.list && \
+  : "Setup APT to install libxml2 from the Debian forky (testing) repo, in order to" && \
+  : "fix CVE-2026-6653 (billion laughs), which is not yet fixed in Trixie. We point" && \
+  : "at the same snapshot date as the rest of the image (DEBIAN_ARCHIVE_DATE), so" && \
+  : "that the build stays reproducible, and we pin forky so that ONLY libxml2 is" && \
+  : "ever pulled from it. Every other package keeps coming from Trixie." && \
+  echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/${DEBIAN_ARCHIVE_DATE}T000000Z forky main" > /etc/apt/sources.list.d/forky.list && \
+  printf 'Package: *\nPin: release n=forky\nPin-Priority: -10\n\nPackage: libxml2\nPin: release n=forky\nPin-Priority: 990\n' > /etc/apt/preferences.d/forky && \
   : "Install the necessary gVisor and Dangerzone dependencies" && \
   apt-get update && \
   apt-get install -y --no-install-recommends \
@@ -36,7 +43,7 @@ RUN \
       -o Dpkg::Options::="--path-exclude=/usr/share/man/*" \
       python3 python3-fitz libreoffice-nogui libreoffice-java-common \
       python3-magic default-jre-headless fonts-noto-cjk fonts-dejavu \
-      runsc unzip && \
+      runsc unzip libxml2/forky && \
   : "Get H2Orestart from Debian: download .deb and extract (can't install due to libreoffice-core vs libreoffice-core-nogui conflict)" && \
   mkdir -p /opt/libreoffice_ext/ && \
   install -dm777 /usr/lib/libreoffice/share/extensions/ && \
