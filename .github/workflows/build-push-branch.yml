@@ -4,6 +4,11 @@ name: Publish image to testing repo from branch
 
 on:
   workflow_dispatch:
+    inputs:
+      reproduce:
+        description: "Verify that the built image is reproducible"
+        type: boolean
+        default: false
   push:
 
 permissions:
@@ -20,7 +25,7 @@ jobs:
       registry: "ghcr.io/${{ github.repository_owner }}"
       registry_user: ${{ github.repository_owner }}
       image_name: "dangerzone-testing/${{ github.head_ref || github.ref_name }}/v1"
-      reproduce: false
+      reproduce: ${{ github.event_name == 'workflow_dispatch' && inputs.reproduce || false }}
       sign: true
       key_name: "tests/assets/dangerzone-testing"
     secrets:

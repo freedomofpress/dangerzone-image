@@ -268,10 +268,10 @@ jobs:
           runtime: docker
           source_date_epoch: ${{ needs.merge.outputs.source_date_epoch }}
           build-args: DEBIAN_ARCHIVE_DATE=${{ needs.merge.outputs.debian_archive_date }}
-          # NOTE: We want the latest BuildKit image only during verification in
-          # a CI context, so that we can catch future regressions as early as
-          # possible.
-          buildkit_image: moby/buildkit:latest
+          # NOTE: Use the same pinned BuildKit image as the build step, so that
+          # this check verifies our builds are deterministic and cannot break
+          # due to an unrelated upstream BuildKit release.
+          buildkit_image: docker.io/moby/buildkit:0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
           annotations: rocks.dangerzone.debian_archive_date=${{ needs.merge.outputs.debian_archive_date }}
 
   sign:
