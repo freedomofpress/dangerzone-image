@@ -114,7 +114,7 @@ jobs:
           context: ./src/
           file: Dockerfile
           platforms: ${{ matrix.platform.name }}
-          buildkit_image: docker.io/moby/buildkit:0.31.2@sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec
+          buildkit_image: docker.io/moby/buildkit:0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
           source_date_epoch: ${{ needs.prepare.outputs.source_date_epoch }}
           push: true
           outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image_name }}",push-by-digest=true,push=true,name-canonical=true
