@@ -39,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           python-version: "3.13"
@@ -61,14 +63,18 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Compute image parameters
         id: params
+        env:
+          REGISTRY: ${{ inputs.registry }}
+          IMAGE_NAME: ${{ inputs.image_name }}
         run: |
           DEBIAN_ARCHIVE_DATE=$(date -u +'%Y%m%d')
           SOURCE_DATE_EPOCH=$(date -u -d ${DEBIAN_ARCHIVE_DATE} +"%s")
           TAG=${DEBIAN_ARCHIVE_DATE}-$(git describe --long --first-parent | sed 's/^v//')
-          FULL_IMAGE_NAME=${{ inputs.registry }}/${{ inputs.image_name }}:${TAG}
+          FULL_IMAGE_NAME=${REGISTRY}/${IMAGE_NAME}:${TAG}
           echo "debian_archive_date=${DEBIAN_ARCHIVE_DATE}" >> $GITHUB_OUTPUT
           echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
@@ -94,6 +100,8 @@ jobs:
             name: "linux/arm64"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Prepare
         run: |
@@ -125,11 +133,12 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           mkdir -p ${{ runner.temp }}/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
-          echo "Image digest is: ${digest}"
+          touch "${{ runner.temp }}/digests/${DIGEST#sha256:}"
+          echo "Image digest is: ${DIGEST}"
 
       - name: Upload digest
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -157,6 +166,8 @@ jobs:
       digest_arm64: ${{ steps.image.outputs.digest_arm64 }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Download digests
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
@@ -174,27 +185,32 @@ jobs:
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+          DEBIAN_ARCHIVE_DATE: ${{ needs.build.outputs.debian_archive_date }}
         run: |
-          DIGESTS=$(printf '${{ needs.build.outputs.image }}@sha256:%s ' *)
+          DIGESTS=$(printf "${IMAGE}@sha256:%s " *)
           # NOTE: The following command does NOT actually add annotations to the root manifest yet.
           # See https://github.com/freedomofpress/dangerzone/issues/1270#issuecomment-3382134379
           docker buildx imagetools create \
-              --annotation "manifest-descriptor:rocks.dangerzone.debian_archive_date=${{ needs.build.outputs.debian_archive_date }}" \
-              -t ${{ needs.build.outputs.image }} \
+              --annotation "manifest-descriptor:rocks.dangerzone.debian_archive_date=${DEBIAN_ARCHIVE_DATE}" \
+              -t "${IMAGE}" \
               ${DIGESTS} || \
           # In case of failures, try to --append instead \
           docker buildx imagetools create \
               --append \
-              --annotation "manifest-descriptor:rocks.dangerzone.debian_archive_date=${{ needs.build.outputs.debian_archive_date }}" \
-              -t ${{ needs.build.outputs.image }} \
+              --annotation "manifest-descriptor:rocks.dangerzone.debian_archive_date=${DEBIAN_ARCHIVE_DATE}" \
+              -t "${IMAGE}" \
               ${DIGESTS}
 
       - name: Inspect image
         id: image
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
         run: |
           # Inspect the image
-          docker buildx imagetools inspect ${{ needs.build.outputs.image }}
-          docker buildx imagetools inspect ${{ needs.build.outputs.image }} --format "{{json .Manifest}}" > manifest
+          docker buildx imagetools inspect "${IMAGE}"
+          docker buildx imagetools inspect "${IMAGE}" --format "{{json .Manifest}}" > manifest
 
           # Calculate and print the digests
           digest_root=$(jq -r .digest manifest)
@@ -229,7 +245,7 @@ jobs:
       packages: write # for uploading attestations.
     # NOTE: The SLSA generator requires a tag ref (not a SHA) for builder
     # identity verification. Pinning to a SHA breaks provenance generation.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0 # zizmor: ignore[unpinned-uses]
     with:
       digest: ${{ needs.merge.outputs[format('digest_{0}', matrix.manifest_type)] }}
       image: ${{ needs.merge.outputs.image }}
@@ -257,6 +273,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Reproduce and verify image
         uses: freedomofpress/repro-build/verify@e3539de5c53c198f897fe6053ec2662f8f0e9bf3 # 1.1.0
@@ -290,9 +307,15 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Prepare env
+        env:
+          REGISTRY: ${{ inputs.registry }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          TAG: ${{ needs.merge.outputs.tag }}
+          DIGEST_ROOT: ${{ needs.merge.outputs.digest_root }}
         run: |-
-          echo "IMAGE_URI=${{ inputs.registry }}/${{ inputs.image_name }}:${{ needs.merge.outputs.tag }}@${{ needs.merge.outputs.digest_root }}" >> $GITHUB_ENV
+          echo "IMAGE_URI=${REGISTRY}/${IMAGE_NAME}:${TAG}@${DIGEST_ROOT}" >> $GITHUB_ENV
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
@@ -309,8 +332,10 @@ jobs:
           password: ${{ secrets.registry_token }}
 
       - name: Sign container
+        env:
+          KEY_NAME: ${{ inputs.key_name }}
         run: |-
-          cosign sign --recursive -d --key=${{ inputs.key_name }}.key "${{ env.IMAGE_URI }}"
+          cosign sign --recursive -d --key="${KEY_NAME}.key" "$IMAGE_URI"
         shell: bash
 
   retag-latest:
@@ -335,12 +360,15 @@ jobs:
           cosign-release: "v2.5.0"
 
       - name: Set base image
+        env:
+          IMAGE_WITH_TAG: ${{ needs.merge.outputs.image }}
         run: |
-          image_with_tag="${{ needs.merge.outputs.image }}"
           # Only keep the image name (strip the part after ":"
-          echo "BASE_IMAGE=${image_with_tag%:*}" >> "$GITHUB_ENV"
+          echo "BASE_IMAGE=${IMAGE_WITH_TAG%:*}" >> "$GITHUB_ENV"
 
       - name: Rotate or seed :old-latest
+        env:
+          NEW_DIGEST: ${{ needs.merge.outputs.digest_root }}
         run: |
           # Rotate :old-latest only when the previous :latest differs from the
           # new digest. Reproducible builds can produce the same digest across
@@ -353,7 +381,7 @@ jobs:
           docker buildx imagetools inspect "$BASE_IMAGE:latest" --format '{{json .Manifest}}' > manifest || true
           if [ -s manifest ]; then
             previous_digest=$(jq -r .digest manifest)
-            new_digest="${{ needs.merge.outputs.digest_root }}"
+            new_digest="$NEW_DIGEST"
             if [ "$previous_digest" != "$new_digest" ]; then
               docker buildx imagetools create -t "$BASE_IMAGE:old-latest" "$BASE_IMAGE@${previous_digest}"
             else
@@ -374,7 +402,9 @@ jobs:
           fi
 
       - name: Update latest tag
+        env:
+          NEW_DIGEST: ${{ needs.merge.outputs.digest_root }}
         run: |
           docker buildx imagetools create \
             -t "$BASE_IMAGE:latest" \
-            "$BASE_IMAGE@${{ needs.merge.outputs.digest_root }}"
+            "$BASE_IMAGE@${NEW_DIGEST}"

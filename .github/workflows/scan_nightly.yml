@@ -11,6 +11,9 @@ on:
     - cron: "0 0 * * *" # Run every day at 00:00 UTC.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   security-scan:
     strategy:
@@ -24,6 +27,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           python-version: "3.13"
@@ -48,7 +52,9 @@ jobs:
           only-fixed: false
           severity-cutoff: critical
       - name: Inspect container scan report
-        run: cat ${{ steps.scan_container.outputs.sarif }}
+        env:
+          SARIF_PATH: ${{ steps.scan_container.outputs.sarif }}
+        run: cat "$SARIF_PATH"
       - name: Scan container image
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:
