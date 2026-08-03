@@ -310,3 +310,21 @@ ignore:
   # Verdict: Dangerzone is not affected because the D-Bus service is not running
   # in the container, and the host one does not leak into the container.
   - vulnerability: CVE-2026-58016
+
+  # CVE-2026-6653
+  # ==============
+  #
+  # GitHub advisory: https://github.com/advisories/GHSA-v4qw-p44r-qhfg
+  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-6653
+  #
+  # Use-after-free in libxml2's xmlParseInternalSubset(), triggerable only
+  # when parsing XML with DTD-loading options enabled and without
+  # XML_PARSE_HUGE.
+  #
+  # Verdict: Dangerzone is not affected. LibreOffice is the only libxml2
+  # consumer in the image, and it parses with XML_PARSE_NOENT | XML_PARSE_HUGE,
+  # which makes the bug unreachable.
+  #
+  # The Debian security team also classifies this as a minor issue (no-dsa).
+  - vulnerability: CVE-2026-6653
+  - vulnerability: GHSA-v4qw-p44r-qhfg
