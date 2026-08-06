@@ -16,7 +16,7 @@ Release:        1%{?dist}
 Summary:        Internal (INSECURE!) Dangerzone document to pixels conversion
 License:        AGPL-3.0
 URL:            https://dangerzone.rocks
-###Source0:        https://github.com/freedomofpress/dangerzone-image/archive/refs/tags/{version}.tar.gz
+Source:         dangerzone-image-%{version}.tar.gz
 BuildArch:      noarch
 
 # TODO: Check what's the actual description that's recorded in the RPM package.
