@@ -11,7 +11,7 @@
 # Package Description
 
 Name:           dangerzone-insecure-converter-qubes
-Version:        1.0.0
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        Internal (INSECURE!) Dangerzone document to pixels conversion
 License:        AGPL-3.0
