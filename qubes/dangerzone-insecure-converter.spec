@@ -36,7 +36,10 @@ Requires:       libreoffice
 # Package Build Instructions
 
 %prep
+# Only unpack sources when building the regular way.
+%if !0%{?_build_in_place}
 %autosetup -p1 -n dangerzone-insecure-converter-%{version}
+%endif
 
 %generate_buildrequires
 %pyproject_buildrequires
