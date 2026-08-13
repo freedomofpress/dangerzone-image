@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 env:
   # Severity cutoff is 'critical' by default, except for the 5th and 20th of
