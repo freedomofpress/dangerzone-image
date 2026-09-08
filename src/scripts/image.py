@@ -7,6 +7,7 @@ Subcommands:
     build              Build a reproducible container image
     verify-attestation Verify SLSA provenance attestation for an image
     reproduce          Reproduce a container image and verify its digest
+    report             Generate a release report with CVE comparison
     release            Attest, reproduce, and release a container image
 """
 
@@ -26,6 +27,8 @@ from tempfile import NamedTemporaryFile
 
 import click
 from repro_build import Builder, analyze_tarball
+
+from .report import generate_report
 
 logger = logging.getLogger(__name__)
 
@@ -661,6 +664,28 @@ def reproduce(platform, runtime, no_cache, debian_archive_date, dry, digest):
 
 @cli.command()
 @click.option(
+    "--ghcr-signer-path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to the ghcr-signer repository",
+)
+@click.option(
+    "--output",
+    default=None,
+    help="Output Markdown file (default: stdout)",
+)
+def report(ghcr_signer_path, output):
+    """Generate a Markdown report with container build info and CVE comparison."""
+    report_text = generate_report(Path(ghcr_signer_path) / "SIGNATURES")
+    if output:
+        Path(output).write_text(report_text)
+        click.echo(f"\nReport written to {output}", err=True)
+    else:
+        click.echo(report_text)
+
+
+@cli.command()
+@click.option(
     "--commit",
     default=None,
     callback=validate_commit_callback,
@@ -787,6 +812,45 @@ def release(
         click.echo("⏩ Skipping signing")
     else:
         sign_image(root_manifest, ghcr_signer_path)
+
+    if dry:
+        click.echo("⏩ Skipping report generation and commit (dry run)")
+        return
+
+    signatures_dir = Path(ghcr_signer_path) / "SIGNATURES"
+
+    click.echo("\n📝 Generating release report...")
+    try:
+        report_text = generate_report(signatures_dir)
+    except Exception as e:
+        click.echo(f"\n⚠️  Could not generate report: {e!s}", err=True)
+        click.echo("The release was successful, but the report could not be generated.")
+        click.echo("You can generate it manually with: uv run image report")
+        return
+
+    ghcr_signer = Path(ghcr_signer_path)
+    try:
+        run_cmd(["git", "-C", str(ghcr_signer), "add", "SIGNATURES"], check=True)
+        run_cmd(
+            [
+                "git",
+                "-C",
+                str(ghcr_signer),
+                "commit",
+                "-m",
+                f"Add signatures for image {root_manifest}\n\n{report_text}",
+            ],
+            check=True,
+        )
+        click.echo("\n✅ Signatures committed to ghcr-signer repo")
+    except subprocess.CalledProcessError:
+        report_path = ghcr_signer / "report.md"
+        report_path.write_text(report_text)
+        click.echo(
+            f"\n⚠️  Could not commit signatures to the ghcr-signer repo. "
+            f"The report has been saved to {report_path}."
+        )
+        click.echo("You can review and commit manually.")
 
 
 if __name__ == "__main__":
