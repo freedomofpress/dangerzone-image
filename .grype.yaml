@@ -328,3 +328,15 @@ ignore:
   # The Debian security team also classifies this as a minor issue (no-dsa).
   - vulnerability: CVE-2026-6653
   - vulnerability: GHSA-v4qw-p44r-qhfg
+
+  # CVE-2026-52490
+  # ==============
+  #
+  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-52490
+  #
+  # Verdict: Dangerzone is not affected because this CVE affects a cropping tool
+  # for TIFF images, when it's called with attacker-controlled arguments. We
+  # neither use this tool, nor perform a crop operation in general.
+  #
+  # The Debian security team also classifies this as a minor issue (no-dsa).
+  - vulnerability: CVE-2026-52490
