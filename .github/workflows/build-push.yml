@@ -57,6 +57,7 @@ jobs:
     outputs:
       debian_archive_date: ${{ steps.params.outputs.debian_archive_date }}
       source_date_epoch: ${{ steps.params.outputs.source_date_epoch }}
+      image_name: ${{ steps.params.outputs.image_name }}
       image: ${{ steps.params.outputs.full_image_name }}
       tag: ${{ steps.params.outputs.tag }}
     steps:
@@ -74,10 +75,13 @@ jobs:
           DEBIAN_ARCHIVE_DATE=$(date -u +'%Y%m%d')
           SOURCE_DATE_EPOCH=$(date -u -d ${DEBIAN_ARCHIVE_DATE} +"%s")
           TAG=${DEBIAN_ARCHIVE_DATE}-$(git describe --long --first-parent | sed 's/^v//')
+          # Container registries require lowercase image names.
+          IMAGE_NAME=${IMAGE_NAME,,}
           FULL_IMAGE_NAME=${REGISTRY}/${IMAGE_NAME}:${TAG}
           echo "debian_archive_date=${DEBIAN_ARCHIVE_DATE}" >> $GITHUB_OUTPUT
           echo "source_date_epoch=${SOURCE_DATE_EPOCH}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
           echo "full_image_name=${FULL_IMAGE_NAME}" >> $GITHUB_OUTPUT
 
   build:
@@ -125,7 +129,7 @@ jobs:
           buildkit_image: docker.io/moby/buildkit:0.30.0@sha256:0168606be2315b7c807a03b3d8aa79beefdb31c98740cebdffdfeebf31190c9f
           source_date_epoch: ${{ needs.prepare.outputs.source_date_epoch }}
           push: true
-          outputs: type=image,"name=${{ inputs.registry }}/${{ inputs.image_name }}",push-by-digest=true,push=true,name-canonical=true
+          outputs: type=image,"name=${{ inputs.registry }}/${{ needs.prepare.outputs.image_name }}",push-by-digest=true,push=true,name-canonical=true
           build-args: DEBIAN_ARCHIVE_DATE=${{ needs.prepare.outputs.debian_archive_date }}
           annotations: rocks.dangerzone.debian_archive_date=${{ needs.prepare.outputs.debian_archive_date }}
           cache: true
@@ -310,12 +314,9 @@ jobs:
           persist-credentials: false
       - name: Prepare env
         env:
-          REGISTRY: ${{ inputs.registry }}
-          IMAGE_NAME: ${{ inputs.image_name }}
-          TAG: ${{ needs.merge.outputs.tag }}
-          DIGEST_ROOT: ${{ needs.merge.outputs.digest_root }}
+          IMAGE_URI: ${{ needs.merge.outputs.image_uri }}
         run: |-
-          echo "IMAGE_URI=${REGISTRY}/${IMAGE_NAME}:${TAG}@${DIGEST_ROOT}" >> $GITHUB_ENV
+          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
