@@ -64,19 +64,8 @@
         /* DataTables dark mode adjustments */
         .dataTables_wrapper .dataTables_length select,
         .dataTables_wrapper .dt-search input,
-        .dataTables_wrapper .dataTables_info,
-        .dataTables_wrapper .dataTables_paginate .paginate_button {
+        .dataTables_wrapper .dataTables_info {
             color: var(--text-color) !important;
-        }
-
-        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
-            color: #9b7f75 !important;
-        }
-
-        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
-             background-color: var(--table-row-hover-bg);
-             border-color: var(--table-border);
-             color: var(--text-color) !important;
         }
 
         #vulnerabilityTable a {
@@ -925,7 +914,8 @@
                     renderer: renderChildRowDetailsDt
                 }
             },
-            dom: '<"dataTables_wrapper"Bf>t<"dataTables_control"ip>',
+            dom: '<"dataTables_wrapper"Bf>t<"dataTables_control"i>',
+            paging: false,
 
             language: {
                 search: "",
@@ -935,18 +925,8 @@
             order: [[0, 'asc']],
             columnDefs: getColumnDefsDt(),
 
-            initComplete: function(settings, json) {
-                setDynamicPageLengthDt(this.api());
-            },
-
             drawCallback: function (settings) {
-                const api = this.api();
-                const pageInfo = api.page.info();
-                const controlsWrapper = $(api.table().container()).find('.dataTables_control');
-                if (controlsWrapper.length) {
-                     controlsWrapper.toggle(pageInfo.pages > 1);
-                }
-                updateSeverityCounts(api);
+                updateSeverityCounts(this.api());
             },
 
             buttons: [
@@ -1004,15 +984,6 @@
 
         initSeverityFilteringDt(table);
         initStateFilteringDt(table);
-
-         const dtInstance = table;
-         const debouncedPageLengthHandler = debounce(function() {
-             if ($.fn.dataTable.isDataTable(tableElement)) {
-                setDynamicPageLengthDt(dtInstance);
-             }
-        }, 250);
-
-        window.addEventListener('resize', debouncedPageLengthHandler);
     }
 
     function getColumnDefsDt() {
@@ -1254,46 +1225,6 @@
         });
     }
 
-    function setDynamicPageLengthDt(table) {
-        try {
-            const tableWrapper = table.table().container();
-            const tableBody = table.table().body();
-            const controls = $(tableWrapper).find('.dataTables_control')[0];
-
-            if (!tableWrapper || !tableBody || !tableBody.rows.length) {
-                return;
-            }
-
-            const firstRow = tableBody.rows[0];
-            const rowHeight = firstRow.offsetHeight;
-
-            if (!rowHeight || rowHeight <= 0) {
-                return;
-            }
-
-            const controlsHeight = controls ? $(controls).outerHeight(true) : 0;
-            const tableBodyTopOffset = tableBody.getBoundingClientRect().top;
-            const verticalBuffer = 60;
-
-            const availableHeight = window.innerHeight - tableBodyTopOffset - controlsHeight - verticalBuffer;
-
-            if (availableHeight <= 0) {
-                return;
-            }
-
-            const calculatedNumberOfRows = Math.floor(availableHeight / rowHeight);
-            const numberOfRowsToShow = Math.max(1, calculatedNumberOfRows);
-
-            const currentPageLength = table.page.len();
-            if (currentPageLength !== numberOfRowsToShow) {
-                table.page.len(numberOfRowsToShow).draw(false);
-            }
-
-        } catch (error) {
-            console.error("Error calculating page length:", error);
-        }
-    }
-
     // ================================================
     // UI Formatting & Utility Helpers
     // ================================================
@@ -1445,31 +1376,6 @@
         }
         return listHtml;
     }
-
-    function debounce(func, wait, immediate = false) {
-        let timeout;
-
-        return function executedFunction() {
-            const context = this;
-            const args = arguments;
-
-            const later = function() {
-                timeout = null;
-                if (!immediate) {
-                    func.apply(context, args);
-                }
-            };
-
-            const callNow = immediate && !timeout;
-
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-
-            if (callNow) {
-                func.apply(context, args);
-            }
-        };
-    };
 
     const packageTypeIcons = {
         'alpm': { type: 'icon', class: 'devicon-archlinux-plain colored' },
