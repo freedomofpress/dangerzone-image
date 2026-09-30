@@ -15,12 +15,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js" integrity="sha384-/RlQG9uf0M2vcTw3CX7fbqgbj/h8wKxw7C3zu9/GxcBPRKOEcESxaxufwRXqzq6n" crossorigin="anonymous"></script>
     <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/jszip-3.10.1/dt-2.3.0/b-3.2.3/b-html5-3.2.3/r-3.0.4/datatables.min.js" integrity="sha384-uD0xNCd/C2vKjG5NDZ8BdHFubelfW0p6XH+6n7crJnbQcPP6aUw5MJ3WfEZFz3bA" crossorigin="anonymous"></script>
 
-    <!-- Include Devicon -->
-    <link rel="stylesheet" type='text/css' href="https://cdn.jsdelivr.net/gh/devicons/devicon@2.16.0/devicon.min.css" />
-
     <!-- Preload SVG icons used in CSS -->
-    <link rel="preload" href="https://api.iconify.design/noto:package.svg" as="image">
-    <link rel="preload" href="https://api.iconify.design/file-icons:alpine-linux.svg" as="image">
     <link rel="preload" href="https://api.iconify.design/vscode-icons:file-type-excel.svg" as="image">
     <link rel="preload" href="https://api.iconify.design/vscode-icons:file-type-pdf2.svg" as="image">
 
@@ -592,20 +587,8 @@
              color: var(--link-visited-color);
         }
 
-        .fixed-in ul {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .fixed-in li {
-            padding: 0;
-            margin: 0;
-        }
-
-        .fixed-in li::before {
-            content: '+ ';
-            color: #c4353c;
+        .package-count {
+            color: var(--text-dim);
         }
     </style>
 
@@ -689,46 +672,8 @@
         }
     </style>
 
-    <!-- Package Type Icon Styling -->
+    <!-- Export Button Icon Styling -->
     <style>
-        .pkg-type-cell {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .pkg-type-cell i,
-        .pkg-type-cell .icon-span {
-            font-size: 1.2em;
-            width: 1.2em;
-            text-align: center;
-            color: var(--text-dim);
-            flex-shrink: 0;
-        }
-
-        .iconify-noto--package {
-            display: inline-block;
-            width: 1.2em;
-            height: 1.2em;
-            vertical-align: middle;
-            background-color: transparent;
-            background-repeat: no-repeat;
-            background-size: contain;
-            background-position: center;
-            background-image: url('https://api.iconify.design/noto:package.svg');
-        }
-
-        .iconify-file-icons--alpine-linux {
-            display: inline-block;
-            width: 1.2em;
-            height: 1.2em;
-            background-color: #c4353c;
-            mask-image: url('https://api.iconify.design/file-icons:alpine-linux.svg');
-            mask-size: contain;
-            mask-repeat: no-repeat;
-            mask-position: center;
-        }
-
         .vscode-icons--file-type-excel {
             display: inline-block;
             width: 20px;
@@ -762,23 +707,41 @@
 {{- $CountLow := 0}}
 {{- $CountUnknown := 0 }}
 
-{{/* Create a list */}}
-{{- $FilteredMatches := list }}
+{{/* Create a list of rows, one per source package and vulnerability */}}
+{{- $Rows := list }}
+{{- $RowsByKey := dict }}
 
 {{/* Loop through all vulns limit output and set count*/}}
 {{- range $vuln := .Matches }}
     {{- if or (eq $vuln.Vulnerability.Severity "Critical") (eq $vuln.Vulnerability.Severity "High") (eq $vuln.Vulnerability.Severity "Medium") (eq $vuln.Vulnerability.Severity "Low") (eq $vuln.Vulnerability.Severity "Unknown") }}
-        {{- $FilteredMatches = append $FilteredMatches $vuln }}
-        {{- if eq $vuln.Vulnerability.Severity "Critical" }}
-            {{- $CountCritical = add $CountCritical 1 }}
-        {{- else if eq $vuln.Vulnerability.Severity "High" }}
-            {{- $CountHigh = add $CountHigh 1 }}
-        {{- else if eq $vuln.Vulnerability.Severity "Medium" }}
-            {{- $CountMedium = add $CountMedium 1 }}
-        {{- else if eq $vuln.Vulnerability.Severity "Low" }}
-            {{- $CountLow = add $CountLow 1 }}
+        {{- /* Binary packages built from the same source share their vulns, so group them by source package */}}
+        {{- $source := $vuln.Artifact.Name }}
+        {{- $version := $vuln.Artifact.Version }}
+        {{- range $vuln.Artifact.Upstreams }}
+            {{- $source = .Name }}
+            {{- if .Version }}
+                {{- $version = .Version }}
+            {{- end }}
+        {{- end }}
+        {{- $key := printf "%s|%s" $source $vuln.Vulnerability.ID }}
+        {{- if hasKey $RowsByKey $key }}
+            {{- $row := get $RowsByKey $key }}
+            {{- $_ := set $row "packages" (append $row.packages $vuln.Artifact.Name) }}
         {{- else }}
-            {{- $CountUnknown = add $CountUnknown 1 }}
+            {{- $row := dict "match" $vuln "source" $source "version" $version "packages" (list $vuln.Artifact.Name) }}
+            {{- $_ := set $RowsByKey $key $row }}
+            {{- $Rows = append $Rows $row }}
+            {{- if eq $vuln.Vulnerability.Severity "Critical" }}
+                {{- $CountCritical = add $CountCritical 1 }}
+            {{- else if eq $vuln.Vulnerability.Severity "High" }}
+                {{- $CountHigh = add $CountHigh 1 }}
+            {{- else if eq $vuln.Vulnerability.Severity "Medium" }}
+                {{- $CountMedium = add $CountMedium 1 }}
+            {{- else if eq $vuln.Vulnerability.Severity "Low" }}
+                {{- $CountLow = add $CountLow 1 }}
+            {{- else }}
+                {{- $CountUnknown = add $CountUnknown 1 }}
+            {{- end }}
         {{- end }}
     {{- end }}
 {{- end }}
@@ -846,41 +809,27 @@
                     <tr>
                         <th>Name</th>
                         <th>Version</th>
-                        <th>Type</th>
                         <th>Vulnerability</th>
                         <th>Severity</th>
                         <th>State</th>
-                        <th>Fixed In</th>
                         <th>Description</th>
+                        <th>Affected packages</th>
                         <th>Related URLs</th>
-                        <th>PURL</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {{- range $FilteredMatches }}
+                    {{- range $Rows }}
                     <tr>
-                        <td>{{.Artifact.Name}}</td>
-                        <td>{{.Artifact.Version}}</td>
-                        <td>{{.Artifact.Type}}</td>
+                        <td>{{.source}}</td>
+                        <td>{{.version}}</td>
                         <td>
-                            <a href="{{.Vulnerability.DataSource}}">{{.Vulnerability.ID}}</a>
+                            <a href="{{.match.Vulnerability.DataSource}}">{{.match.Vulnerability.ID}}</a>
                         </td>
-                        <td>{{.Vulnerability.Severity}}</td>
-                        <td>{{.Vulnerability.Fix.State}}</td>
-                        <td>
-                            {{- if .Vulnerability.Fix.Versions }}
-                            <ul>
-                                {{- range .Vulnerability.Fix.Versions }}
-                                <li>{{ . }}</li>
-                                {{- end }}
-                            </ul>
-                            {{- else }}
-                            N/A
-                            {{- end }}
-                        </td>
-                        <td>{{html .Vulnerability.Description}}</td>
-                        <td>{{ toJson .Vulnerability.URLs }}</td>
-                        <td>{{ .Artifact.PURL }}</td>
+                        <td>{{.match.Vulnerability.Severity}}</td>
+                        <td>{{.match.Vulnerability.Fix.State}}</td>
+                        <td>{{html .match.Vulnerability.Description}}</td>
+                        <td>{{ toJson .packages }}</td>
+                        <td>{{ toJson .match.Vulnerability.URLs }}</td>
                     </tr>
                     {{- end }}
                 </tbody>
@@ -943,17 +892,15 @@
                         columns: [
                             'Name:name',
                             'Version:name',
-                            'Type:name',
                             'Vulnerability:name',
                             'Severity:name',
-                            'State:name',
-                            'Fixed In:name'
+                            'State:name'
                         ]
                     },
                     customize: function (doc) {
                         doc.styles.tableHeader.alignment = 'left';
                         doc.defaultStyle.alignment = 'left';
-                        doc.content[doc.content.length - 1].table.widths = ['*', 'auto', 'auto', '*', 'auto', 'auto', '*'];
+                        doc.content[doc.content.length - 1].table.widths = ['*', 'auto', '*', 'auto', 'auto'];
                     }
                 },
                 {
@@ -969,13 +916,11 @@
                          columns: [
                             'Name:name',
                             'Version:name',
-                            'Type:name',
                             'Vulnerability:name',
                             'Severity:name',
                             'State:name',
-                            'Fixed In:name',
-                            'Related URLs:name',
-                            'PURL:name'
+                            'Packages:name',
+                            'Related URLs:name'
                         ]
                     }
                 }
@@ -991,6 +936,12 @@
             {
                 name: 'Name',
                 targets: 0,
+                createdCell: function (td, cellData, rowData, row, col) {
+                    const packages = parseJsonList(rowData[6]);
+                    if (packages.length > 1) {
+                        $(td).append(` <span class="package-count">(${packages.length} packages)</span>`);
+                    }
+                },
                 searchable: true,
                 responsivePriority: 1
             },
@@ -1001,24 +952,14 @@
                 responsivePriority: 5
             },
             {
-                name: 'Type',
-                targets: 2,
-                render: function (data, type, row) { return data; },
-                createdCell: function (td, cellData, rowData, row, col) {
-                    $(td).html(formatTypeCell(cellData));
-                },
-                searchable: false,
-                responsivePriority: 6
-            },
-            {
                 name: 'Vulnerability',
-                targets: 3,
+                targets: 2,
                 searchable: true,
                 responsivePriority: 2
             },
             {
                 name: 'Severity',
-                targets: 4,
+                targets: 3,
                 render: function (data, type, row) { return data; },
                 createdCell: function (td, cellData, rowData, row, col) {
                     $(td).html(formatPill(cellData, 'severity'));
@@ -1028,7 +969,7 @@
             },
             {
                 name: 'State',
-                targets: 5,
+                targets: 4,
                 render: function (data, type, row) { return data; },
                 createdCell: function (td, cellData, rowData, row, col) {
                     $(td).html(formatPill(cellData, 'state'));
@@ -1037,29 +978,20 @@
                 responsivePriority: 4
             },
             {
-                name: 'Fixed In',
-                targets: 6,
-                createdCell: function (td, cellData, rowData, row, col) {
-                    $(td).addClass('fixed-in');
-                },
+                name: 'Description',
+                targets: 5,
                 searchable: true,
-                responsivePriority: 7
+                className: 'none',
             },
             {
-                name: 'Description',
-                targets: 7,
+                name: 'Packages',
+                targets: 6,
                 searchable: true,
                 className: 'none',
             },
             {
                 name: 'Related URLs',
-                targets: 8,
-                searchable: false,
-                className: 'none',
-            },
-            {
-                name: 'PURL',
-                targets: 9,
+                targets: 7,
                 searchable: false,
                 className: 'none',
             },
@@ -1078,19 +1010,17 @@
                 let contentHtml = '';
 
                 switch (index) {
-                    case 2:
-                        contentHtml = formatTypeCell(data);
-                        break;
-                    case 4:
+                    case 3:
                         contentHtml = formatPill(data, 'severity');
                         break;
-                    case 5:
+                    case 4:
                         contentHtml = formatPill(data, 'state');
                         break;
-                     case 7:
+                     case 5:
                          contentHtml = data ? String(data) : '';
                          break;
-                    case 8:
+                    case 6:
+                    case 7:
                         contentHtml = formatUrlList(data);
                         break;
                     default:
@@ -1130,9 +1060,9 @@
 
             if (activeSeverityFilters.length > 0) {
                 const filterRegex = activeSeverityFilters.map(sev => `^${sev}$`).join('|');
-                table.column(4).search(filterRegex, true, false);
+                table.column(3).search(filterRegex, true, false);
             } else {
-                table.column(4).search('');
+                table.column(3).search('');
             }
 
             table.draw();
@@ -1162,7 +1092,7 @@
                 return true;
             }
 
-            const stateValue = data[5];
+            const stateValue = data[4];
             if (!stateValue) {
                 return true;
             }
@@ -1200,7 +1130,7 @@
         const rows = table.rows({ filter: 'applied' }).data();
 
         for (let i = 0; i < rows.length; i += 1) {
-            const rawValue = rows[i][4];
+            const rawValue = rows[i][3];
             const normalized = String(rawValue || '')
                 .replace(/<[^>]*>/g, '')
                 .trim()
@@ -1349,19 +1279,23 @@
         return `<span class="${baseClass} ${specificClass}">${text}</span>`;
     }
 
-    function formatUrlList(data) {
-        let urls = [];
+    function parseJsonList(data) {
+        let items = [];
         try {
             if (data && typeof data === 'string') {
-                urls = JSON.parse(data);
+                items = JSON.parse(data);
             }
         } catch (error) {
-            console.error("Failed to parse Related URLs JSON:", data, error);
-            urls = [];
+            console.error("Failed to parse JSON list:", data, error);
         }
+        return Array.isArray(items) ? items : [];
+    }
+
+    function formatUrlList(data) {
+        const urls = parseJsonList(data);
 
         let listHtml = '';
-        if (Array.isArray(urls) && urls.length > 0) {
+        if (urls.length > 0) {
             listHtml += '<ul>';
             urls.forEach(url => {
                 if (url && typeof url === 'string') {
@@ -1375,54 +1309,6 @@
             listHtml += '</ul>';
         }
         return listHtml;
-    }
-
-    const packageTypeIcons = {
-        'alpm': { type: 'icon', class: 'devicon-archlinux-plain colored' },
-        'apk': { type: 'fallback', class: 'iconify-file-icons--alpine-linux' },
-        'cocoapods': { type: 'icon', class: 'devicon-apple-original colored' },
-        'composer': { type: 'icon', class: 'devicon-composer-line colored' },
-        'conan': { type: 'icon', class: 'devicon-cplusplus-plain' },
-        'deb': { type: 'icon', class: 'devicon-debian-plain colored' },
-        'dotnet': { type: 'icon', class: 'devicon-dotnetcore-plain colored' },
-        'gem': { type: 'icon', class: 'devicon-ruby-plain colored' },
-        'go-module': { type: 'icon', class: 'devicon-go-original-wordmark colored' },
-        'haskell': { type: 'icon', class: 'devicon-haskell-plain colored' },
-        'hex': { type: 'icon', class: 'devicon-elixir-plain colored' },
-        'java': { type: 'icon', class: 'devicon-java-plain colored' },
-        'jenkins-plugin': { type: 'icon', class: 'devicon-jenkins-line' },
-        'linux-kernel-module': { type: 'icon', class: 'devicon-linux-plain colored' },
-        'lua': { type: 'icon', class: 'devicon-lua-plain colored' },
-        'npm': { type: 'icon', class: 'devicon-npm-original-wordmark colored' },
-        'nix': { type: 'icon', class: 'devicon-nixos-plain colored' },
-        'portage': { type: 'icon', class: 'devicon-gentoo-plain colored' },
-        'pub': { type: 'icon', class: 'devicon-dart-plain colored' },
-        'python': { type: 'icon', class: 'devicon-python-plain colored' },
-        'rpm': { type: 'icon', class: 'devicon-redhat-plain colored' },
-        'rust-crate': { type: 'icon', class: 'devicon-rust-plain colored' },
-        'swift': { type: 'icon', class: 'devicon-swift-plain colored' },
-        'wordpress-plugin': { type: 'icon', class: 'devicon-wordpress-plain colored' },
-        'github-action': { type: 'icon', class: 'devicon-github-original colored' },
-        'binary': { type: 'fallback', class: 'iconify-noto--package' },
-        'buildroot': { type: 'fallback', class: 'iconify-noto--package' },
-        'graalvm-native-image': { type: 'fallback', class: 'iconify-noto--package' },
-        'kb': { type: 'icon', class: 'devicon-windows11-original colored' },
-    };
-
-    function formatTypeCell(data) {
-        const typeKey = data ? String(data).toLowerCase() : 'unknown';
-        const iconInfo = packageTypeIcons[typeKey];
-        const fallbackInfo = { type: 'fallback', class: 'noto--package' };
-        const chosenInfo = iconInfo || fallbackInfo;
-
-        let iconHtml = '';
-        if (chosenInfo.type === 'icon') {
-            iconHtml = `<i class="${chosenInfo.class}"></i>`;
-        } else {
-            iconHtml = `<span class="icon-span ${chosenInfo.class}"></span>`;
-        }
-
-        return `<span class="pkg-type-cell">${iconHtml}<span>${data}</span></span>`;
     }
 
     // ================================================
