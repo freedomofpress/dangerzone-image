@@ -420,16 +420,22 @@
         }
 
         .dt-button.buttons-pdf,
-        .dt-button.buttons-excel {
+        .dt-button.buttons-excel,
+        .dt-button.buttons-json {
             background-color: transparent !important;
             border: 1px solid #c4353c !important;
             box-shadow: none !important;
         }
 
         .dt-button.buttons-pdf:hover,
-        .dt-button.buttons-excel:hover {
+        .dt-button.buttons-excel:hover,
+        .dt-button.buttons-json:hover {
             background-color: rgba(196, 53, 60, 0.12) !important;
             box-shadow: var(--glow) !important;
+        }
+
+        .dt-button.buttons-json {
+            font-size: 20px !important;
         }
 
         .dt-button.buttons-pdf .vscode-icons--file-type-pdf2,
@@ -835,11 +841,6 @@
                 </tbody>
             </table>
         </div>
-        <div>
-            <p>
-                You can always <a href="grype.json" download="grype.json">download 💾</a> the full Grype report in JSON format.
-            </p>
-        </div>
     </div>
     <script>
 
@@ -922,6 +923,17 @@
                             'Packages:name',
                             'Related URLs:name'
                         ]
+                    }
+                },
+                {
+                    text: '💾',
+                    titleAttr: 'Download the full Grype report (JSON)',
+                    className: 'buttons-json',
+                    action: function () {
+                        const link = document.createElement('a');
+                        link.href = 'grype.json';
+                        link.download = 'grype.json';
+                        link.click();
                     }
                 }
             ]
