@@ -833,7 +833,14 @@
                         </td>
                         <td>{{.match.Vulnerability.Severity}}</td>
                         <td>{{.match.Vulnerability.Fix.State}}</td>
-                        <td>{{html .match.Vulnerability.Description}}</td>
+                        {{- /* Debian may not have a description for recent vulns, so fall back to the related (e.g., NVD) ones */}}
+                        {{- $description := .match.Vulnerability.Description }}
+                        {{- range .match.RelatedVulnerabilities }}
+                            {{- if not $description }}
+                                {{- $description = .Description }}
+                            {{- end }}
+                        {{- end }}
+                        <td>{{html $description}}</td>
                         <td>{{ toJson .packages }}</td>
                         <td>{{ toJson .match.Vulnerability.URLs }}</td>
                     </tr>
