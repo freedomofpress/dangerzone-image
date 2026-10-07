@@ -216,6 +216,10 @@ runsc_argv = [
     # Disable DirectFS for to make the seccomp filter even stricter,
     # at some performance cost.
     "--directfs=false",
+    # Disable cgroup support, since it should be enforced by the outer
+    # container.
+    # See https://github.com/freedomofpress/dangerzone/issues/1574
+    "--ignore-cgroups",
 ]
 if os.environ.get("RUNSC_DEBUG"):
     runsc_argv += ["--debug=true", "--alsologtostderr=true"]
