@@ -170,5 +170,6 @@ In order to update the Dangerzone image repo, you need to:
    - `qubes/dangerzone-insecure-converter.spec`
 2. Update the packages with `uv lock --upgrade`
 3. Commit, send a PR, wait for CI tests to pass, and merge.
+   - You are strongly encouraged to check that the large tests pass as well.
 4. Tag the tip of the `main` branch with a command like `git tag -s 1.1.0 -m 1.1.0`
    - Resist the temptation to include the `v` prefix...
