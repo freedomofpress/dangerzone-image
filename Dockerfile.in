@@ -50,8 +50,9 @@ RUN \
   strip_path() { for p in "$@"; do test -e "$p" || { echo "strip: missing $p" >&2; exit 1; }; rm -rf "$p"; done; } && \
   : "gVisor: drop some binaries we don't use" && \
   strip_path \
-      /usr/bin/runsc-metric-server \
-      /usr/bin/containerd-shim-runsc-v1 && \
+      /usr/bin/containerd-shim-runsc-v1 \
+      /usr/bin/gvisor-bin/checkpointgofer \
+      /usr/bin/gvisor-bin/runsc-metric-server && \
   : "Libreoffice: remove import libraries used by libwpftdrawlo.so, whose formats we do not support" && \
   for lib in libcdr libfreehand libmspub libpagemaker libqxp libvisio libzmf; do \
     matches=$(ls ${MULTIARCH_DIR}/${lib}-*.so* 2>/dev/null) && \
