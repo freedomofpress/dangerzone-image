@@ -221,7 +221,7 @@ class DocumentToPixels(DangerzoneConverter):
 
         for page in doc.pages():
             # TODO check if page.number is doc-controlled
-            page_num = page.number + 1  # pages start in 1
+            page_num = page.number + 1  # pages start in 1  # ty: ignore[unsupported-operator]
 
             self.update_progress(
                 f"Converting page {page_num}/{doc.page_count} to pixels"

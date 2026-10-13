@@ -2,12 +2,12 @@
 # Dockerfile args below. For more info about this file, read
 # docs/reproducibility.md.
 
-ARG DEBIAN_IMAGE_DIGEST=sha256:b6e2a152f22a40ff69d92cb397223c906017e1391a73c952b588e51af8883bf8
+ARG DEBIAN_IMAGE_DIGEST=sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 FROM docker.io/library/debian@${DEBIAN_IMAGE_DIGEST} AS dangerzone-image
 
-ARG GVISOR_ARCHIVE_DATE=20260601
-ARG DEBIAN_ARCHIVE_DATE=20260610
+ARG GVISOR_ARCHIVE_DATE=20261005
+ARG DEBIAN_ARCHIVE_DATE=20261012
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -50,8 +50,17 @@ RUN \
   strip_path() { for p in "$@"; do test -e "$p" || { echo "strip: missing $p" >&2; exit 1; }; rm -rf "$p"; done; } && \
   : "gVisor: drop some binaries we don't use" && \
   strip_path \
-      /usr/bin/runsc-metric-server \
-      /usr/bin/containerd-shim-runsc-v1 && \
+      /usr/bin/containerd-shim-runsc-v1 \
+      /usr/bin/gvisor-bin/checkpointgofer \
+      /usr/bin/gvisor-bin/runsc-metric-server && \
+  : "gVisor: strip debug symbols from runsc, using a temporarily installed binutils" && \
+  apt-get install -y --no-install-recommends binutils && \
+  strip --strip-debug /usr/bin/runsc && \
+  apt-get purge -y --auto-remove binutils && \
+  : "Java: drop the class data sharing archives, which are only used as a startup cache" && \
+  strip_path \
+      /usr/lib/jvm/default-java/lib/server/classes.jsa \
+      /usr/lib/jvm/default-java/lib/server/classes_nocoops.jsa && \
   : "Libreoffice: remove import libraries used by libwpftdrawlo.so, whose formats we do not support" && \
   for lib in libcdr libfreehand libmspub libpagemaker libqxp libvisio libzmf; do \
     matches=$(ls ${MULTIARCH_DIR}/${lib}-*.so* 2>/dev/null) && \
