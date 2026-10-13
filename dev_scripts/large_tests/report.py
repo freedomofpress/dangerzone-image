@@ -90,12 +90,17 @@ def get_test_status(testcase: ET.Element) -> str:
     return "PASS"
 
 
-def get_extension(name: str) -> str:
+def get_doc_name(testcase: ET.Element) -> str:
+    name = testcase.attrib.get("name", "")
     m = re.search(r"\[([^\]]+)\]", name)
-    if m:
-        ext = Path(m.group(1)).suffix.lstrip(".")
-        return ext if ext else "none"
-    return "none"
+    assert m is not None and m.group(1), f"Unexpected test case name: {name}"
+    return m.group(1)
+
+
+def get_extension(testcase: ET.Element) -> str:
+    name = get_doc_name(testcase)
+    ext = Path(name).suffix.lstrip(".")
+    return ext if ext else "none"
 
 
 SIZE_BUCKET_NAMES = ["0KB  -  10KB", "10KB - 100KB", "100KB - 10MB", "10MB - 100MB"]
@@ -174,7 +179,7 @@ def generate_report(xml_file: str) -> str:
     size_timing: dict[str, dict] = {}
     for tc in test_cases:
         name = tc.attrib.get("name", "")
-        ext = get_extension(name)
+        ext = get_extension(tc)
         bucket = get_size_bucket(name)
         ext_counter[ext] += 1
         d = size_timing.setdefault(bucket, {"count": 0, "total": 0.0})
@@ -265,9 +270,7 @@ def generate_report(xml_file: str) -> str:
     failed_entries: list[tuple[str, list[str]]] = []
     for tc in test_cases:
         if get_test_status(tc) in ("FAIL", "ERROR"):
-            name = tc.attrib.get("name", "")
-            m = re.search(r"\[([^\]]+)\]", name)
-            fname = m.group(1) if m else name
+            fname = get_doc_name(tc)
             container_lines = get_container_lines(tc)
             preview = scrub_and_filter(container_lines)[:3]
             failed_entries.append((fname, preview))
