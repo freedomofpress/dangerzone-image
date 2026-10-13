@@ -46,7 +46,11 @@ def is_expected_line(line: str) -> bool:
 
 
 def scrub_and_filter(lines: list[str]) -> list[str]:
-    return [l for l in (scrub_container_line(line) for line in lines) if not is_expected_line(l)]
+    return [
+        l
+        for l in (scrub_container_line(line) for line in lines)
+        if not is_expected_line(l)
+    ]
 
 
 def parse_junit(xml_file: str) -> ET.Element:
@@ -193,10 +197,14 @@ def generate_report(xml_file: str) -> str:
             grand_docs += d["count"]
             grand_total += d["total"]
             avg = d["total"] / d["count"]
-            lines.append(f"    {bucket:<15} {d['count']:>6} {d['total']:>8.1f}s {avg:>7.1f}s")
+            lines.append(
+                f"    {bucket:<15} {d['count']:>6} {d['total']:>8.1f}s {avg:>7.1f}s"
+            )
     if grand_docs:
         lines.append(f"    {'─' * 31}")
-        lines.append(f"    {'Total':<15} {grand_docs:>6} {grand_total:>8.1f}s {grand_total / grand_docs:>7.1f}s")
+        lines.append(
+            f"    {'Total':<15} {grand_docs:>6} {grand_total:>8.1f}s {grand_total / grand_docs:>7.1f}s"
+        )
     lines.append("")
     lines.append("")
 
