@@ -246,11 +246,12 @@ def generate_report(xml_file: str) -> str:
 
     timeout_files = []
     for tc in test_cases:
-        output = extract_captured_text(tc, "system-out")
-        if "TIMEOUT EXCEEDED" in output:
-            m = re.search(r"'(.*?)'", output)
-            if m:
-                timeout_files.append(m.group(1))
+        failure = tc.find("failure")
+        if failure is None:
+            continue
+        failure_message = failure.get("message")
+        if failure_message is not None and "timed out after" in failure_message:
+            timeout_files.append(get_doc_name(tc))
 
     lines.append("=== TIMEOUTS ===")
     lines.append("")
