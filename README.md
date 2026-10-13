@@ -54,9 +54,9 @@ The output of the container is streamed to `stdout` in a custom binary format:
 
 1.  **Total Pages**: A 4-byte unsigned integer representing the total number of pages in the converted document.
 2.  **For each page**:
-    a.  **Page Width**: A 4-byte unsigned integer representing the width of the page in pixels.
-    b.  **Page Height**: A 4-byte unsigned integer representing the height of the page in pixels.
-    c.  **Pixel Data**: bytes of raw RGB pixel data
+    1.  **Page Width**: A 4-byte unsigned integer representing the width of the page in pixels.
+    2.  **Page Height**: A 4-byte unsigned integer representing the height of the page in pixels.
+    3.  **Pixel Data**: bytes of raw RGB pixel data
         - Length is `width` x `height` x 3 color channels
 
 ## dangerzone-insecure-conversion python package
