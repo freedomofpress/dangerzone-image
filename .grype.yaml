@@ -340,3 +340,12 @@ ignore:
   #
   # The Debian security team also classifies this as a minor issue (no-dsa).
   - vulnerability: CVE-2026-52490
+
+  # CVE-2026-19445
+  # ==============
+  #
+  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-19445
+  #
+  # Verdict: Dangerzone is not affected because this CVE affects TLS servers.
+  # The Dangerzone sandbox is offline and does not run any internal TLS service.
+  - vulnerability: CVE-2026-19445
