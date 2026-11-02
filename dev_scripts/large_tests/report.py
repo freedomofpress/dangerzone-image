@@ -46,7 +46,11 @@ def is_expected_line(line: str) -> bool:
 
 
 def scrub_and_filter(lines: list[str]) -> list[str]:
-    return [l for l in (scrub_container_line(line) for line in lines) if not is_expected_line(l)]
+    return [
+        l
+        for l in (scrub_container_line(line) for line in lines)
+        if not is_expected_line(l)
+    ]
 
 
 def parse_junit(xml_file: str) -> ET.Element:
@@ -86,12 +90,17 @@ def get_test_status(testcase: ET.Element) -> str:
     return "PASS"
 
 
-def get_extension(name: str) -> str:
+def get_doc_name(testcase: ET.Element) -> str:
+    name = testcase.attrib.get("name", "")
     m = re.search(r"\[([^\]]+)\]", name)
-    if m:
-        ext = Path(m.group(1)).suffix.lstrip(".")
-        return ext if ext else "none"
-    return "none"
+    assert m is not None and m.group(1), f"Unexpected test case name: {name}"
+    return m.group(1)
+
+
+def get_extension(testcase: ET.Element) -> str:
+    name = get_doc_name(testcase)
+    ext = Path(name).suffix.lstrip(".")
+    return ext if ext else "none"
 
 
 SIZE_BUCKET_NAMES = ["0KB  -  10KB", "10KB - 100KB", "100KB - 10MB", "10MB - 100MB"]
@@ -170,7 +179,7 @@ def generate_report(xml_file: str) -> str:
     size_timing: dict[str, dict] = {}
     for tc in test_cases:
         name = tc.attrib.get("name", "")
-        ext = get_extension(name)
+        ext = get_extension(tc)
         bucket = get_size_bucket(name)
         ext_counter[ext] += 1
         d = size_timing.setdefault(bucket, {"count": 0, "total": 0.0})
@@ -193,10 +202,14 @@ def generate_report(xml_file: str) -> str:
             grand_docs += d["count"]
             grand_total += d["total"]
             avg = d["total"] / d["count"]
-            lines.append(f"    {bucket:<15} {d['count']:>6} {d['total']:>8.1f}s {avg:>7.1f}s")
+            lines.append(
+                f"    {bucket:<15} {d['count']:>6} {d['total']:>8.1f}s {avg:>7.1f}s"
+            )
     if grand_docs:
         lines.append(f"    {'─' * 31}")
-        lines.append(f"    {'Total':<15} {grand_docs:>6} {grand_total:>8.1f}s {grand_total / grand_docs:>7.1f}s")
+        lines.append(
+            f"    {'Total':<15} {grand_docs:>6} {grand_total:>8.1f}s {grand_total / grand_docs:>7.1f}s"
+        )
     lines.append("")
     lines.append("")
 
@@ -233,11 +246,12 @@ def generate_report(xml_file: str) -> str:
 
     timeout_files = []
     for tc in test_cases:
-        output = extract_captured_text(tc, "system-out")
-        if "TIMEOUT EXCEEDED" in output:
-            m = re.search(r"'(.*?)'", output)
-            if m:
-                timeout_files.append(m.group(1))
+        failure = tc.find("failure")
+        if failure is None:
+            continue
+        failure_message = failure.get("message")
+        if failure_message is not None and "timed out after" in failure_message:
+            timeout_files.append(get_doc_name(tc))
 
     lines.append("=== TIMEOUTS ===")
     lines.append("")
@@ -257,9 +271,7 @@ def generate_report(xml_file: str) -> str:
     failed_entries: list[tuple[str, list[str]]] = []
     for tc in test_cases:
         if get_test_status(tc) in ("FAIL", "ERROR"):
-            name = tc.attrib.get("name", "")
-            m = re.search(r"\[([^\]]+)\]", name)
-            fname = m.group(1) if m else name
+            fname = get_doc_name(tc)
             container_lines = get_container_lines(tc)
             preview = scrub_and_filter(container_lines)[:3]
             failed_entries.append((fname, preview))
