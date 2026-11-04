@@ -350,11 +350,16 @@ ignore:
   # The Dangerzone sandbox is offline and does not run any internal TLS service.
   - vulnerability: CVE-2026-19445
 
-  # CVE-2026-91403
-  # ==============
+  # CVE-2026-91403, CVE-2026-114820
+  # ===============================
   #
-  # Oracle advisory: https://www.oracle.com/security-alerts/alert-cve-2026-91403.html
-  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-91403
+  # Oracle advisories:
+  # * https://www.oracle.com/security-alerts/alert-cve-2026-91403.html
+  # * https://www.oracle.com/security-alerts/alert-cve-2026-114820.html
+  #
+  # Debian tracker:
+  # * https://security-tracker.debian.org/tracker/CVE-2026-91403
+  # * https://security-tracker.debian.org/tracker/CVE-2026-114820
   #
   # This is an eMudhra CVE, but for JSSE CA stores. Affected versions can be
   # MitM'ed.
@@ -362,3 +367,4 @@ ignore:
   # Verdict: Dangerzone is not affected because the container image is
   # airgapped (--network=none).
   - vulnerability: CVE-2026-91403
+  - vulnerability: CVE-2026-114820
