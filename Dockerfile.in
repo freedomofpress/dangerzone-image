@@ -77,6 +77,16 @@ RUN \
   rm -rf /etc/ssl/certs/java/cacerts && \
   rm -rf /var/log/* /var/cache/ldconfig/aux-cache
 
+# Harden our Java runtime.
+RUN --mount=type=bind,source=./helpers/jaxp.properties,target=/tmp/jaxp.properties \
+    for prop in /etc/java-*-openjdk/jaxp.properties; do \
+        if [ ! -f "${prop}" ]; then \
+            echo "jaxp: could not locate jaxp.properties" >&2; \
+            exit 1; \
+        fi; \
+        cat /tmp/jaxp.properties >> "${prop}"; \
+    done
+
 # Create an unprivileged user both for gVisor and for running Dangerzone.
 # XXX: Make the shadow field "date of last password change" a constant
 # number.
