@@ -368,3 +368,23 @@ ignore:
   # airgapped (--network=none).
   - vulnerability: CVE-2026-91403
   - vulnerability: CVE-2026-114820
+
+  # CVE-2026-78663, GO-2026-6612
+  # ============================
+  #
+  # Debian tracker: https://security-tracker.debian.org/tracker/CVE-2026-78663
+  #
+  # Verdict: This vulnerability affects HTTP/2 servers written in Go. Dangerzone
+  # does not run such a server, nor does it have any Internet connection.
+  #
+  - vulnerability: CVE-2026-78663
+  - vulnerability: GO-2026-6612
+
+  # CVE-2026-56857, GO-2026-6604
+  # ============================
+  #
+  # Go advisory: https://pkg.go.dev/vuln/GO-2026-6604
+  #
+  # Verdict: This vulnerability affects Windows hosts, but the Dangerzone image
+  # always runs in a Linux host, either natively or via a Linux VM.
+  - vulnerability: GO-2026-6604
