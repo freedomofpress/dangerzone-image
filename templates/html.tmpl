@@ -11,13 +11,7 @@
 
     <!-- Source DataTables.js and its dependencies -->
     <link href="https://cdn.datatables.net/v/dt/jq-3.7.0/jszip-3.10.1/dt-2.3.0/b-3.2.3/b-html5-3.2.3/r-3.0.4/datatables.min.css" rel="stylesheet" integrity="sha384-i3FrIG8iE4wl9Hmwo+yL2xgtj0L+/QgCSGfIAJbuoowqsGIdhIpg9ax2eizUyCZw" crossorigin="anonymous">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js" integrity="sha384-VFQrHzqBh5qiJIU0uGU5CIW3+OWpdGGJM9LBnGbuIH2mkICcFZ7lPd/AAtI7SNf7" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js" integrity="sha384-/RlQG9uf0M2vcTw3CX7fbqgbj/h8wKxw7C3zu9/GxcBPRKOEcESxaxufwRXqzq6n" crossorigin="anonymous"></script>
     <script src="https://cdn.datatables.net/v/dt/jq-3.7.0/jszip-3.10.1/dt-2.3.0/b-3.2.3/b-html5-3.2.3/r-3.0.4/datatables.min.js" integrity="sha384-uD0xNCd/C2vKjG5NDZ8BdHFubelfW0p6XH+6n7crJnbQcPP6aUw5MJ3WfEZFz3bA" crossorigin="anonymous"></script>
-
-    <!-- Preload SVG icons used in CSS -->
-    <link rel="preload" href="https://api.iconify.design/vscode-icons:file-type-excel.svg" as="image">
-    <link rel="preload" href="https://api.iconify.design/vscode-icons:file-type-pdf2.svg" as="image">
 
     <!-- Font Awesome for search icon -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -419,16 +413,12 @@
             box-shadow: var(--glow-strong) !important;
         }
 
-        .dt-button.buttons-pdf,
-        .dt-button.buttons-excel,
         .dt-button.buttons-json {
             background-color: transparent !important;
             border: 1px solid #c4353c !important;
             box-shadow: none !important;
         }
 
-        .dt-button.buttons-pdf:hover,
-        .dt-button.buttons-excel:hover,
         .dt-button.buttons-json:hover {
             background-color: rgba(196, 53, 60, 0.12) !important;
             box-shadow: var(--glow) !important;
@@ -436,12 +426,6 @@
 
         .dt-button.buttons-json {
             font-size: 20px !important;
-        }
-
-        .dt-button.buttons-pdf .vscode-icons--file-type-pdf2,
-        .dt-button.buttons-excel .vscode-icons--file-type-excel {
-            width: 32px;
-            height: 32px;
         }
 
         .child-row-details {
@@ -678,33 +662,6 @@
         }
     </style>
 
-    <!-- Export Button Icon Styling -->
-    <style>
-        .vscode-icons--file-type-excel {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            vertical-align: middle;
-            background-color: transparent;
-            background-repeat: no-repeat;
-            background-size: contain;
-            background-position: center;
-            background-image: url('https://api.iconify.design/vscode-icons:file-type-excel.svg');
-        }
-
-        .vscode-icons--file-type-pdf2 {
-            display: inline-block;
-            width: 1em;
-            height: 1em;
-            vertical-align: middle;
-            background-color: transparent;
-            background-repeat: no-repeat;
-            background-size: contain;
-            background-position: center;
-            background-image: url('https://api.iconify.design/vscode-icons:file-type-pdf2.svg');
-        }
-    </style>
-
 </head>
 {{/* Initialize counters */}}
 {{- $CountCritical := 0 }}
@@ -887,51 +844,6 @@
             },
 
             buttons: [
-                {
-                    extend: 'pdfHtml5',
-                    text: '<span class="vscode-icons--file-type-pdf2"></span>',
-                    titleAttr: 'Export to PDF',
-                    title: function () { return getReportMetadata().title; },
-                    messageTop: function () { return getReportMetadata().message; },
-                    filename: function () {
-                        return `vulnerability-report-${getReportMetadata().safeName}`;
-                    },
-                    exportOptions: {
-                        columns: [
-                            'Name:name',
-                            'Version:name',
-                            'Vulnerability:name',
-                            'Severity:name',
-                            'State:name'
-                        ]
-                    },
-                    customize: function (doc) {
-                        doc.styles.tableHeader.alignment = 'left';
-                        doc.defaultStyle.alignment = 'left';
-                        doc.content[doc.content.length - 1].table.widths = ['*', 'auto', '*', 'auto', 'auto'];
-                    }
-                },
-                {
-                    extend: 'excelHtml5',
-                    text: '<span class="vscode-icons--file-type-excel"></span>',
-                    titleAttr: 'Export to Excel',
-                    title: function () { return getReportMetadata().title; },
-                    messageTop: function () { return getReportMetadata().message; },
-                    filename: function () {
-                        return `vulnerability-report-${getReportMetadata().safeName}`;
-                    },
-                    exportOptions: {
-                         columns: [
-                            'Name:name',
-                            'Version:name',
-                            'Vulnerability:name',
-                            'Severity:name',
-                            'State:name',
-                            'Packages:name',
-                            'Related URLs:name'
-                        ]
-                    }
-                },
                 {
                     text: '💾',
                     titleAttr: 'Download the full Grype report (JSON)',
